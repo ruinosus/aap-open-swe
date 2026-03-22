@@ -1,0 +1,64 @@
+{
+  "module": {
+    "displayName": "Open SWE Agent",
+    "description": "Open-source framework for building your org's internal coding agent"
+  },
+  "agents": {
+    "swe-coder": {
+      "displayName": "SWE Coder"
+    }
+  },
+  "pr": {
+    "title_types": {
+      "fix": "fix",
+      "feat": "feat",
+      "chore": "chore",
+      "ci": "ci"
+    },
+    "draft_label": "Draft",
+    "no_changes_detected": "No changes detected",
+    "body_description_header": "## Description",
+    "body_test_plan_header": "## Test Plan"
+  },
+  "comments": {
+    "pr_opened": "I've completed the implementation and opened a PR: {pr_url}",
+    "pr_updated": "I've updated the PR with the latest changes: {pr_url}",
+    "task_started": "Working on this now...",
+    "task_completed": "Task completed successfully.",
+    "no_changes": "No changes were needed for this task.",
+    "auth_required": "GitHub authentication required. Please authorize: {auth_url}",
+    "auth_bot_mode": "Using bot token for authentication (no per-user OAuth configured).",
+    "sandbox_creating": "Setting up sandbox environment...",
+    "sandbox_ready": "Sandbox ready, cloning repository...",
+    "repo_cloned": "Repository cloned. Starting work.",
+    "error_sandbox": "Failed to create sandbox environment. Please retry.",
+    "error_clone": "Failed to clone repository: {error}",
+    "error_general": "An error occurred: {error}"
+  },
+  "rules": {
+    "max_pr_files": "PR touches too many files ({changed_files}). Consider splitting into smaller PRs.",
+    "no_force_push": "Force push is not allowed on this repository.",
+    "test_before_pr": "Tests must pass before opening a PR.",
+    "no_destructive_commands": "Destructive commands (rm -rf /, DROP TABLE, etc.) are blocked.",
+    "max_file_size": "File exceeds maximum allowed size ({max_size_kb} KB)."
+  },
+  "guardrails": {
+    "input_blocked": "Input blocked: {reason}",
+    "output_blocked": "Output blocked: potential sensitive data detected.",
+    "destructive_command": "Destructive command pattern detected and blocked."
+  },
+  "status": {
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "error": "Error"
+  },
+  "welcome": {
+    "greeting": "Open SWE Agent",
+    "tagline": "Your internal coding agent — triggered from Slack, Linear, or GitHub"
+  },
+  "prompt-pills": [
+    { "label": "Fix a bug", "prompt": "Fix the bug described in issue #{issue_number}" },
+    { "label": "Code review", "prompt": "Review the PR #{pr_number} and provide feedback" },
+    { "label": "Implement feature", "prompt": "Implement the feature described in the Linear ticket" }
+  ]
+}

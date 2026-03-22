@@ -1,0 +1,341 @@
+apiVersion: cockpit.io/v1
+kind: Module
+metadata:
+  name: open-swe
+  displayName: Open SWE Agent
+  version: '0.1.0'
+  description: >-
+    Open-source framework for building your org's internal coding agent.
+    Built on LangGraph and Deep Agents — cloud sandboxes, Slack/Linear/GitHub
+    triggers, subagent orchestration, and automatic PR creation.
+  icon: robot
+  group: agent
+  route: /open-swe
+  artifactPrefix: 'open-swe.'
+  annotations:
+    framework: deep-agents
+    runtime: langgraph
+    language: python
+    data-classification: internal
+
+spec:
+  # ─── Agents ────────────────────────────────────────────────
+  agents:
+    - id: swe-coder
+      name: SWE Coder
+      description: >-
+        Autonomous coding agent that executes software engineering tasks
+        in isolated cloud sandboxes. Handles bug fixes, feature implementation,
+        code review, and PR creation.
+      instruction: agents/swe-coder.md
+      model: anthropic:claude-opus-4-6
+      temperature: 0
+      maxTokens: 20000
+      executionMode: local
+      tools:
+        - execute
+        - read_file
+        - write_file
+        - edit_file
+        - ls
+        - glob
+        - grep
+        - write_todos
+        - task
+        - commit_and_open_pr
+        - fetch_url
+        - http_request
+        - linear_comment
+        - slack_thread_reply
+        - github_comment
+
+  # ─── Artifacts (Configuration) ─────────────────────────────
+  artifacts:
+    # Model configuration
+    - key: open-swe.config.model
+      category: configuration
+      defaultValue: ''
+    - key: open-swe.config.model_temperature
+      category: configuration
+      defaultValue: '0'
+    - key: open-swe.config.model_max_tokens
+      category: configuration
+      defaultValue: '20000'
+
+    # Default repository
+    - key: open-swe.config.default_repo_owner
+      category: configuration
+      defaultValue: ''
+    - key: open-swe.config.default_repo_name
+      category: configuration
+      defaultValue: ''
+
+    # Slack-specific repo overrides
+    - key: open-swe.config.slack_repo_owner
+      category: configuration
+      defaultValue: ''
+    - key: open-swe.config.slack_repo_name
+      category: configuration
+      defaultValue: ''
+
+    # Slack bot identity
+    - key: open-swe.config.slack_bot_user_id
+      category: configuration
+      defaultValue: ''
+    - key: open-swe.config.slack_bot_username
+      category: configuration
+      defaultValue: ''
+
+    # GitHub allowed orgs (comma-separated)
+    - key: open-swe.config.allowed_github_orgs
+      category: configuration
+      defaultValue: ''
+
+    # Sandbox configuration
+    - key: open-swe.config.sandbox_type
+      category: configuration
+      defaultValue: 'langsmith'
+
+    # LangGraph server URL
+    - key: open-swe.config.langgraph_url
+      category: configuration
+      defaultValue: 'http://localhost:2024'
+
+    # Recursion limit for agent
+    - key: open-swe.config.recursion_limit
+      category: configuration
+      defaultValue: '1000'
+
+    # Team-to-repo mapping (JSON)
+    - key: open-swe.mappings.linear_team_to_repo
+      category: configuration
+      defaultValue: '{}'
+
+    # GitHub user-to-email mapping (JSON)
+    - key: open-swe.mappings.github_user_email
+      category: configuration
+      defaultValue: '{}'
+
+    # Runtime state
+    - key: open-swe.state.active_threads
+      category: state
+      defaultValue: '0'
+    - key: open-swe.state.total_prs_created
+      category: state
+      defaultValue: '0'
+
+  # ─── Connections ───────────────────────────────────────────
+  connections:
+    - id: github-api
+      transport: rest
+      url: https://api.github.com
+      description: GitHub API for PR creation, comments, and repo operations
+
+    - id: linear-api
+      transport: rest
+      url: https://api.linear.app/graphql
+      description: Linear GraphQL API for issue tracking integration
+
+    - id: slack-api
+      transport: rest
+      url: https://slack.com/api
+      description: Slack API for thread replies and reactions
+
+    - id: langsmith-api
+      transport: rest
+      url: https://api.smith.langchain.com
+      description: LangSmith API for sandbox provisioning and OAuth user resolution
+
+    - id: langgraph-server
+      transport: rest
+      url: http://localhost:2024
+      description: Local LangGraph server for agent execution
+
+  # ─── Rules ─────────────────────────────────────────────────
+  rules:
+    - id: max-pr-files
+      name: Max PR file count
+      condition: 'changed_files <= 50'
+      enforcement: warn
+      scope: output
+      evaluation: deterministic
+      message: 'PR touches too many files ({changed_files}). Consider splitting.'
+      appliesTo:
+        - swe-coder
+
+    - id: no-force-push
+      name: No force push
+      condition: 'force_push == false'
+      enforcement: block
+      scope: output
+      evaluation: deterministic
+      message: 'Force push is not allowed'
+      appliesTo:
+        - swe-coder
+
+    - id: test-before-pr
+      name: Tests must pass before PR
+      condition: 'tests_passed == true'
+      enforcement: block
+      scope: output
+      evaluation: deterministic
+      message: 'Tests must pass before opening PR'
+      appliesTo:
+        - swe-coder
+
+    - id: no-full-test-suite
+      name: No full test suite execution
+      condition: 'full_suite_run == false'
+      enforcement: warn
+      scope: output
+      evaluation: deterministic
+      message: 'Never run the full test suite. Only run tests related to changed files.'
+      appliesTo:
+        - swe-coder
+
+    - id: max-file-size
+      name: Max file size
+      condition: 'file_size_kb <= 500'
+      enforcement: warn
+      scope: output
+      evaluation: deterministic
+      message: 'File exceeds maximum allowed size ({file_size_kb} KB)'
+      appliesTo:
+        - swe-coder
+
+    - id: no-backup-files
+      name: No backup files
+      condition: 'backup_files_count == 0'
+      enforcement: block
+      scope: output
+      evaluation: deterministic
+      message: 'Backup files are not allowed. All changes are tracked by git.'
+      appliesTo:
+        - swe-coder
+
+  # ─── Guardrails ────────────────────────────────────────────
+  guardrails:
+    input:
+      - type: regex
+        pattern: '(rm\s+-rf\s+/|DROP\s+TABLE|DELETE\s+FROM\s+\w+\s*;|truncate\s+table)'
+        action: block
+        message: 'Destructive command detected and blocked'
+
+      - type: regex
+        pattern: '(curl\s+.*\|\s*sh|wget\s+.*\|\s*bash|eval\s*\()'
+        action: block
+        message: 'Potentially unsafe command execution pattern detected'
+
+    output:
+      - type: regex
+        pattern: '(password|secret|api[_-]?key|token)\s*[:=]\s*[''"][^''"]{8,}'
+        action: block
+        message: 'Potential secret or credential in output detected'
+
+      - type: regex
+        pattern: '(AKIA[0-9A-Z]{16}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36})'
+        action: block
+        message: 'Cloud provider credential pattern detected in output'
+
+  # ─── Telemetry ─────────────────────────────────────────────
+  telemetry:
+    enabled: true
+    serviceName: open-swe
+    exporter:
+      type: otlp
+      endpoint: '${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}'
+      protocol: http/protobuf
+    instrument:
+      agents: true
+      artifacts: true
+      hooks: true
+      rules: true
+      tools: true
+      hitl: false
+
+  # ─── Hooks ─────────────────────────────────────────────────
+  hooks:
+    - event: onToolError
+      type: middleware
+      script: agent/middleware/tool_error_handler.py
+      description: Catches and formats tool errors into structured error messages
+
+    - event: beforeModel
+      type: middleware
+      script: agent/middleware/check_message_queue.py
+      description: Injects queued follow-up messages that arrived mid-run
+
+    - event: afterModel
+      type: middleware
+      script: agent/middleware/ensure_no_empty_msg.py
+      description: Ensures agent always calls at least one tool per turn
+
+    - event: afterAgent
+      type: middleware
+      script: agent/middleware/open_pr.py
+      description: Safety net — opens a PR if the agent completed without calling commit_and_open_pr
+
+  # ─── Network ───────────────────────────────────────────────
+  network:
+    app: 2024
+    extra:
+      webhooks: 8000
+
+  # ─── i18n ──────────────────────────────────────────────────
+  i18n:
+    defaultLocale: en
+    locales:
+      en:
+        resources: i18n/en.json
+      pt-BR:
+        resources: i18n/pt-BR.json
+
+  # ─── Lifecycle ─────────────────────────────────────────────
+  lifecycle:
+    roadmap:
+      - id: aap-sdk-integration
+        title: AAP SDK manifest-driven configuration
+        status: in-progress
+        priority: high
+      - id: multi-agent-orchestration
+        title: Multi-agent task decomposition with specialized sub-agents
+        status: planned
+        priority: medium
+      - id: ci-feedback-loop
+        title: CI/CD feedback loop — agent retries on CI failure
+        status: planned
+        priority: medium
+      - id: custom-sandbox-templates
+        title: Per-repo custom sandbox templates with pre-installed dependencies
+        status: planned
+        priority: low
+    issues: []
+    decisions:
+      - id: manifest-over-env
+        title: Manifest YAML as primary config source, env vars as fallback
+        status: accepted
+        context: Need declarative config management for enterprise deployments
+        decision: Use AAP SDK ManifestInstance as primary config source with env var fallback
+        decidedAt: '2026-03-22'
+      - id: keep-deep-agents
+        title: Keep Deep Agents framework unchanged, integrate AAP SDK as config layer
+        status: accepted
+        context: Deep Agents provides the core agent loop, sandbox, and tool infrastructure
+        decision: AAP SDK wraps config only — no changes to Deep Agents internals
+        decidedAt: '2026-03-22'
+
+  # ─── Labels ────────────────────────────────────────────────
+  labels:
+    tags:
+      - coding-agent
+      - swe
+      - langgraph
+      - deep-agents
+      - github
+      - slack
+      - linear
+      - sandbox
+    custom:
+      domain: software-engineering
+      maturity: beta
+      trigger-modes: webhook

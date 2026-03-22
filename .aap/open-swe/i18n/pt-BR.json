@@ -1,0 +1,64 @@
+{
+  "module": {
+    "displayName": "Open SWE Agent",
+    "description": "Framework open-source para construir o agente de codificacao interno da sua organizacao"
+  },
+  "agents": {
+    "swe-coder": {
+      "displayName": "SWE Coder"
+    }
+  },
+  "pr": {
+    "title_types": {
+      "fix": "fix",
+      "feat": "feat",
+      "chore": "chore",
+      "ci": "ci"
+    },
+    "draft_label": "Rascunho",
+    "no_changes_detected": "Nenhuma alteracao detectada",
+    "body_description_header": "## Descricao",
+    "body_test_plan_header": "## Plano de Teste"
+  },
+  "comments": {
+    "pr_opened": "Concluí a implementacao e abri um PR: {pr_url}",
+    "pr_updated": "Atualizei o PR com as ultimas alteracoes: {pr_url}",
+    "task_started": "Trabalhando nisso agora...",
+    "task_completed": "Tarefa concluida com sucesso.",
+    "no_changes": "Nenhuma alteracao foi necessaria para esta tarefa.",
+    "auth_required": "Autenticacao GitHub necessaria. Por favor, autorize: {auth_url}",
+    "auth_bot_mode": "Usando token de bot para autenticacao (sem OAuth por usuario configurado).",
+    "sandbox_creating": "Configurando ambiente sandbox...",
+    "sandbox_ready": "Sandbox pronto, clonando repositorio...",
+    "repo_cloned": "Repositorio clonado. Iniciando trabalho.",
+    "error_sandbox": "Falha ao criar ambiente sandbox. Por favor, tente novamente.",
+    "error_clone": "Falha ao clonar repositorio: {error}",
+    "error_general": "Ocorreu um erro: {error}"
+  },
+  "rules": {
+    "max_pr_files": "PR modifica muitos arquivos ({changed_files}). Considere dividir em PRs menores.",
+    "no_force_push": "Force push nao e permitido neste repositorio.",
+    "test_before_pr": "Testes devem passar antes de abrir um PR.",
+    "no_destructive_commands": "Comandos destrutivos (rm -rf /, DROP TABLE, etc.) estao bloqueados.",
+    "max_file_size": "Arquivo excede o tamanho maximo permitido ({max_size_kb} KB)."
+  },
+  "guardrails": {
+    "input_blocked": "Entrada bloqueada: {reason}",
+    "output_blocked": "Saida bloqueada: dados sensiveis potenciais detectados.",
+    "destructive_command": "Padrao de comando destrutivo detectado e bloqueado."
+  },
+  "status": {
+    "healthy": "Saudavel",
+    "degraded": "Degradado",
+    "error": "Erro"
+  },
+  "welcome": {
+    "greeting": "Open SWE Agent",
+    "tagline": "Seu agente de codificacao interno — acionado via Slack, Linear ou GitHub"
+  },
+  "prompt-pills": [
+    { "label": "Corrigir um bug", "prompt": "Corrija o bug descrito na issue #{issue_number}" },
+    { "label": "Revisao de codigo", "prompt": "Revise o PR #{pr_number} e forneca feedback" },
+    { "label": "Implementar funcionalidade", "prompt": "Implemente a funcionalidade descrita no ticket Linear" }
+  ]
+}
