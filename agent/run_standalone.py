@@ -152,10 +152,16 @@ Use the execute tool for all git operations.
 
     logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
 
+    # PR-type skills need tools (execute, read_file, write_file, etc.) to
+    # make changes, commit, and push. Review skills only need to analyze and
+    # return JSON, so tools=[] is fine (faster, no tool overhead).
+    pr_skills = ("doc-generator", "test-generator", "project-docs")
+    use_default_tools = skill_id in pr_skills
+
     agent = create_deep_agent(
         model=model,
         system_prompt=system_prompt,
-        tools=[],
+        **({} if use_default_tools else {"tools": []}),
         backend=sandbox,
         response_format=response_format,
         middleware=middleware if middleware else None,
