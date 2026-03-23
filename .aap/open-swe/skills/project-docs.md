@@ -102,7 +102,9 @@ git push origin aap-open-swe/docs-update-{issue_number}
 
 ## Rules
 
-- **Only modify .md files** — never touch source code, config, or tests.
+- **Only modify .md files** — never touch source code, config, YAML, workflows, or tests.
+- **NEVER modify files in `.github/`** — workflow files require special permissions and must not be changed by this skill.
+- **NEVER modify files in `.aap/`** — manifest and skill files are managed separately.
 - **Read before writing** — always read the current file content before making changes.
 - **Be accurate** — verify claims by reading the actual code. Don't guess file counts, function names, or feature lists.
 - **Keep the voice** — match the existing tone and style of each document.
