@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Patterns that match common secret formats
 SECRET_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("AWS Access Key", re.compile(r"AKIA[0-9A-Z]{16}")),
-    ("OpenAI API Key", re.compile(r"sk-[a-zA-Z0-9]{32,}")),
+    ("OpenAI API Key", re.compile(r"sk-[a-zA-Z0-9\-]{20,}")),
     ("GitHub Token", re.compile(r"ghp_[a-zA-Z0-9]{36}")),
     ("GitHub App Token", re.compile(r"ghs_[a-zA-Z0-9]{36}")),
     ("Anthropic Key", re.compile(r"sk-ant-[a-zA-Z0-9\-]{32,}")),

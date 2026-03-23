@@ -64,3 +64,6 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "e2e: End-to-end tests that call real LLM APIs (require API keys, cost money)",
+]
