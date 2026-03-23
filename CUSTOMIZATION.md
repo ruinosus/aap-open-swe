@@ -1,6 +1,8 @@
 # Customization Guide
 
-Open SWE is designed to be forked and customized for your org. The core agent is assembled in a single function — `get_agent()` in `agent/server.py` — where you can swap out the sandbox, model, tools, and triggers.
+Open SWE is designed to be forked and customized for your org. The core agent is assembled in a single function — `get_agent()` in `agent/server.py` — where you can swap out the sandbox, model, tools, triggers, and manifest-driven skills.
+
+Custom documentation workflows should be added as skill markdown files referenced from `.aap/open-swe/manifest.yaml`, following the same pattern used by the existing `project-docs` skill.
 
 ```python
 # agent/server.py — the key lines

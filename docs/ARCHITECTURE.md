@@ -7,6 +7,8 @@ When triggered, it reads the issue/PR context, clones the repository, makes code
 using an LLM (GPT-4o, Claude, etc.), and opens a draft Pull Request — all without any
 external server, ngrok tunnel, or cloud sandbox.
 
+Documentation-focused skills are first-class citizens in this flow: the `project-docs` skill is designed to update repository markdown such as `README.md` and architecture docs when the manifest and trigger rules route a task to documentation maintenance.
+
 ### Architecture Diagram
 
 ![Architecture](trigger-flow.drawio.png)

@@ -21,6 +21,8 @@ Alem disso, possui **5 skills dinamicas** que ativam automaticamente:
 - **Test Generator** — gera testes unitarios para codigo sem cobertura
 - **Project Docs** — atualiza os .md do projeto (README, ARCHITECTURE, etc.)
 
+O skill **Project Docs** e acionado pelo mesmo fluxo de manifest + triggers que os demais skills e serve para manter a documentacao do repositorio alinhada com as mudancas recentes.
+
 Built on [LangGraph](https://langchain-ai.github.io/langgraph/) + [Deep Agents](https://github.com/langchain-ai/deepagents).
 
 ## Quick Start
