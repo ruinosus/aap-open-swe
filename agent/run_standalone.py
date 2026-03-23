@@ -221,27 +221,38 @@ Use the execute tool for all git operations.
         else:
             logger.warning("Could not parse structured review from agent output")
 
-    # Check if agent made changes
+    # Check if agent made changes — multiple strategies since the agent
+    # may have already committed, or even pushed to a different branch.
     diff_result = sandbox.execute("git diff --stat HEAD")
     staged_result = sandbox.execute("git diff --cached --stat")
     status_result = sandbox.execute("git status --porcelain")
 
-    has_changes = bool(
+    has_uncommitted = bool(
         (diff_result.output and diff_result.output.strip())
         or (staged_result.output and staged_result.output.strip())
         or (status_result.output and status_result.output.strip())
     )
 
-    branch_name = f"aap-open-swe/issue-{issue_number}"
+    # Also check if agent created commits ahead of origin (already committed)
+    current_branch = sandbox.execute("git rev-parse --abbrev-ref HEAD")
+    current_branch_name = current_branch.output.strip() if current_branch.output else ""
+    unpushed = sandbox.execute(f"git log origin/{current_branch_name}..HEAD --oneline 2>/dev/null")
+    has_unpushed = bool(unpushed.output and unpushed.output.strip())
+
+    has_changes = has_uncommitted or has_unpushed
+    branch_name = current_branch_name or f"aap-open-swe/issue-{issue_number}"
 
     if has_changes:
-        if status_result.output and status_result.output.strip():
+        if has_uncommitted:
             # Uncommitted changes — commit them
             sandbox.execute("git add -A")
             sandbox.execute(f'git commit -m "fix: address issue #{issue_number}"')
 
-        # Create branch and push
-        sandbox.execute(f"git checkout -b {branch_name} 2>/dev/null || git checkout {branch_name}")
+        if branch_name == "main" or branch_name == "master":
+            # Don't push to main — create a feature branch
+            branch_name = f"aap-open-swe/issue-{issue_number}"
+            sandbox.execute(f"git checkout -b {branch_name}")
+
         push_result = sandbox.execute(
             f"git push https://x-access-token:{github_token}@github.com/{repo_owner}/{repo_name}.git {branch_name} --force"
         )
