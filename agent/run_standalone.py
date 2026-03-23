@@ -56,12 +56,14 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     if skill_id and skill_id not in ("swe-coder", ""):
         skill_instruction = get_skill_instruction(skill_id)
         if skill_instruction:
-            system_prompt = skill_instruction.format(
-                working_dir=repo_dir,
-                repo_owner=repo_owner,
-                repo_name=repo_name,
-                pr_number=pr_number,
-                issue_number=issue_number,
+            # Use simple string replace instead of .format() to avoid
+            # conflicts with JSON curly braces in skill instructions
+            system_prompt = (
+                skill_instruction.replace("{working_dir}", repo_dir)
+                .replace("{repo_owner}", repo_owner)
+                .replace("{repo_name}", repo_name)
+                .replace("{pr_number}", str(pr_number))
+                .replace("{issue_number}", str(issue_number))
             )
         else:
             logger.warning("Skill %s not found, falling back to swe-coder", skill_id)
