@@ -7,7 +7,7 @@ Open SWE is designed to be forked and customized for your org. The core agent is
 return create_deep_agent(
     model=make_model("anthropic:claude-opus-4-6", temperature=0, max_tokens=20_000),
     system_prompt=construct_system_prompt(repo_dir, ...),
-    tools=[http_request, fetch_url, commit_and_open_pr, linear_comment, slack_thread_reply],
+    tools=[http_request, fetch_url, commit_and_open_pr, linear_comment, slack_thread_reply, github_comment],
     backend=sandbox_backend,
     middleware=[
         ToolErrorMiddleware(),
@@ -182,6 +182,7 @@ Open SWE ships with five custom tools on top of the built-in Deep Agents tools (
 | `http_request` | `agent/tools/http_request.py` | HTTP API calls |
 | `linear_comment` | `agent/tools/linear_comment.py` | Post comments on Linear tickets |
 | `slack_thread_reply` | `agent/tools/slack_thread_reply.py` | Reply in Slack threads |
+| `github_comment` | `agent/tools/github_comment.py` | Post comments on GitHub issues/PRs |
 
 ### Adding a tool
 
@@ -390,7 +391,9 @@ Drop an `AGENTS.md` file in the root of any repository to add repo-specific inst
 
 ## 6. Middleware
 
-Middleware hooks run around the agent loop. Open SWE includes four:
+Middleware hooks run around the agent loop. Open SWE includes seven middleware components across two categories: **active middleware** (registered in the agent loop) and **skill middleware** (used only during skill execution).
+
+**Active middleware** (registered in `get_agent()` for all runs):
 
 | Middleware | Type | Purpose |
 |---|---|---|
@@ -398,6 +401,14 @@ Middleware hooks run around the agent loop. Open SWE includes four:
 | `check_message_queue_before_model` | Before model | Injects follow-up messages that arrived mid-run |
 | `ensure_no_empty_msg` | Before model | Prevents empty messages from reaching the model |
 | `open_pr_if_needed` | After agent | Safety net — opens a PR if the agent didn't |
+
+**Skill middleware** (used during skill execution in `run_standalone.py`):
+
+| Middleware | File | Purpose |
+|---|---|---|
+| `create_output_validator` | `agent/middleware/output_validator.py` | Validates structured JSON output for review/PR skills |
+| `secret_filter` | `agent/middleware/secret_filter.py` | Redacts API keys, tokens, and credentials from agent output |
+| `create_skill_file_scope_middleware` | `agent/middleware/skill_file_scope.py` | Enforces per-skill file write restrictions (e.g., project-docs can only modify `.md` files) |
 
 Add custom middleware by appending to the middleware list in `get_agent()`. See the [LangChain middleware docs](https://python.langchain.com/docs/concepts/agents/#middleware) for the `@before_model` and `@after_agent` decorators.
 

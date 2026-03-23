@@ -92,7 +92,7 @@ GOOGLE_API_KEY=...
 
 ## AAP SDK Integration
 
-The `agent/aap_config.py` module provides 25+ typed accessor functions:
+The `agent/aap_config.py` module provides 34 typed accessor functions:
 
 ```python
 from agent.aap_config import (

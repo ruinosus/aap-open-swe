@@ -46,7 +46,7 @@ framework for internal coding agents. It uses LangGraph + Deep Agents for the ag
 We added manifest-driven configuration via the AAP SDK:
 
 - **`.aap/open-swe/manifest.yaml`** — All config lives here (model, connections, rules, guardrails, telemetry, i18n)
-- **`agent/aap_config.py`** — 25+ typed accessor functions that read from the manifest with env var fallback
+- **`agent/aap_config.py`** — 34 typed accessor functions that read from the manifest with env var fallback
 - **`agent/server.py`** — Modified to load model ID, temperature, max tokens, and system prompt from the manifest
 - **`agent/webapp.py`** — Modified to load default repo, Slack config, and allowed orgs from the manifest
 
@@ -211,7 +211,7 @@ User comments on PR: "@aap-open-swe fix the linting errors"
 ```
 System Prompt (from manifest)
     + Task (from issue/comment)
-    + Tools (execute, read_file, write_file, edit_file, ls, glob, grep)
+    + Tools (execute, read_file, write_file, edit_file, ls, glob, grep, commit_and_open_pr, github_comment, ...)
     + LocalShellBackend (GitHub Actions runner)
     |
     v
@@ -317,7 +317,10 @@ gh issue comment 1 --body "@aap-open-swe please implement this"
 |------|---------|
 | `.github/workflows/agent.yml` | 8-trigger GitHub Actions workflow |
 | `agent/run_standalone.py` | Standalone agent runner with SKILL_ID + structured output |
-| `agent/aap_config.py` | Manifest config layer (30+ functions, incl. skill accessors) |
+| `agent/aap_config.py` | Manifest config layer (34 functions, incl. skill accessors) |
+| `agent/middleware/output_validator.py` | Validates structured JSON output for review/PR skills |
+| `agent/middleware/secret_filter.py` | Redacts credentials and API keys from agent output |
+| `agent/middleware/skill_file_scope.py` | Enforces per-skill file write restrictions |
 | `agent/schemas.py` | Pydantic schemas for structured JSON output (ReviewOutput, PROutput) |
 | `agent/review_poster.py` | GitHub Reviews API integration (inline PR comments) |
 | `agent/server.py` | Deep Agent creation (model + prompt + tools) |
