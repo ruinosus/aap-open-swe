@@ -254,7 +254,7 @@ Use the execute tool for all git operations.
             sandbox.execute(f"git checkout -b {branch_name}")
 
         push_result = sandbox.execute(
-            f"git push https://x-access-token:{github_token}@github.com/{repo_owner}/{repo_name}.git {branch_name} --force"
+            f"git push https://x-access-token:{github_token}@github.com/{repo_owner}/{repo_name}.git HEAD:refs/heads/{branch_name} --force"
         )
 
         if push_result.exit_code != 0:
