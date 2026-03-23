@@ -6,41 +6,118 @@ como testamos essa protecao, e como voce pode criar novos guardrails.
 ## Indice
 
 1. [Visao Geral](#visao-geral)
-2. [Os 3 Guardrails](#os-3-guardrails)
-3. [Como Funcionam no Pipeline](#como-funcionam-no-pipeline)
-4. [Testes — 3 Camadas de Garantia](#testes--3-camadas-de-garantia)
-5. [Como Criar um Novo Guardrail](#como-criar-um-novo-guardrail)
-6. [Referencia de Arquivos](#referencia-de-arquivos)
+2. [As 3 Camadas de Guardrails](#as-3-camadas-de-guardrails)
+3. [Guardrails por Skill (Middleware)](#guardrails-por-skill-middleware)
+4. [Como Funcionam no Pipeline](#como-funcionam-no-pipeline)
+5. [Testes — 3 Camadas de Garantia](#testes--3-camadas-de-garantia)
+6. [Como Criar um Novo Guardrail](#como-criar-um-novo-guardrail)
+7. [Referencia de Arquivos](#referencia-de-arquivos)
 
 ---
 
 ## Visao Geral
 
-Guardrails sao middleware que interceptam o comportamento do agente em pontos
-estrategicos do pipeline. Eles **nao dependem do LLM seguir instrucoes** — sao
-codigo deterministico que executa independente do que o modelo fizer.
+O sistema de guardrails tem **3 camadas** que se complementam:
+
+| Camada | Fonte | O que faz | Onde |
+|--------|-------|-----------|------|
+| **AAP SDK** | `cockpit-aap-sdk` | Detecta PII (email, CPF, telefone, cartao de credito) e prompt injection | `GuardrailMiddleware` + `RegexGuardrailAdapter` |
+| **Manifest** | `manifest.yaml` | Regex patterns configuraveis (destructive commands, secrets, cloud keys) | `manifest_guardrails.py` |
+| **Skill** | `agent/middleware/` | File scope, secret filter, output validator — por skill | Middleware customizados |
+
+Todas as camadas sao **codigo deterministico** — nao dependem do LLM.
 
 ```
 User Task
     |
     v
-[before_model] skill_file_scope  <-- Bloqueia writes fora do escopo
+[wrap_model_call] AAP SDK GuardrailMiddleware  <-- PII detection (email, CPF, etc.)
+    |
+    v
+[before_model] manifest_input_guardrail        <-- Blocks: rm -rf, DROP TABLE, curl|sh
+    |
+    v
+[before_model] skill_file_scope                <-- Blocks writes fora do escopo da skill
     |
     v
 LLM decide acao + chama tools
     |
     v
-[after_agent] secret_filter      <-- Redacta secrets do output
+[after_agent] manifest_output_guardrail        <-- Redacta: api_key=, AKIA*, sk-*, ghp_*
     |
     v
-[after_agent] output_validator   <-- Valida JSON antes de postar
+[after_agent] secret_filter                    <-- Redacta patterns extras (Bearer, connection strings)
+    |
+    v
+[after_agent] output_validator                 <-- Valida JSON antes de postar
     |
     v
 Output (GitHub Reviews API / PR)
 ```
 
-**Principio:** Codigo deterministico garante seguranca. O LLM pode errar,
-mas o middleware nao.
+---
+
+## As 3 Camadas de Guardrails
+
+### Camada 1: AAP SDK (`GuardrailMiddleware`)
+
+O [cockpit-aap-sdk](https://github.com/ruinosus/aap-sdk) fornece `GuardrailMiddleware`
+que implementa a interface `AgentMiddleware` do LangChain nativamente. Ele usa o
+`RegexGuardrailAdapter` que detecta PII automaticamente:
+
+- Email addresses
+- CPF numbers
+- Phone numbers
+- Credit card numbers
+- Prompt injection patterns
+
+```python
+from cockpit_aap import GuardrailMiddleware, RegexGuardrailAdapter
+
+adapter = RegexGuardrailAdapter()
+mw = GuardrailMiddleware(guardrail=adapter, module_id="open-swe", agent_id="swe-coder")
+
+# Passa direto para create_deep_agent(middleware=[mw, ...])
+```
+
+**Importante:** Este middleware roda para TODOS os agentes (swe-coder + skills).
+
+### Camada 2: Manifest (`manifest.yaml`)
+
+Os guardrails do manifest sao regex patterns declarativos:
+
+```yaml
+# .aap/open-swe/manifest.yaml
+guardrails:
+  input:
+    - type: regex
+      pattern: '(rm\s+-rf\s+/|DROP\s+TABLE|DELETE\s+FROM)'
+      action: block
+      message: 'Destructive command detected and blocked'
+
+    - type: regex
+      pattern: '(curl\s+.*\|\s*sh|wget\s+.*\|\s*bash|eval\s*\()'
+      action: block
+      message: 'Unsafe command execution pattern detected'
+
+  output:
+    - type: regex
+      pattern: '(password|secret|api[_-]?key|token)\s*[:=]\s*[''"][^''"]{8,}'
+      action: block
+      message: 'Potential secret in output detected'
+
+    - type: regex
+      pattern: '(AKIA[0-9A-Z]{16}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36})'
+      action: block
+      message: 'Cloud provider credential detected in output'
+```
+
+Esses patterns sao lidos por `agent/middleware/manifest_guardrails.py` e compilados
+em middleware automaticamente. **Para adicionar um novo guardrail, basta editar o YAML.**
+
+### Camada 3: Skill Middleware (customizados)
+
+Middleware Python que aplicam logica mais complexa que regex:
 
 ---
 
@@ -126,36 +203,42 @@ WARNING output_validator: Skill code-review output validation failed (2 errors):
 
 ## Como Funcionam no Pipeline
 
-Os guardrails sao plugados no `agent/run_standalone.py` quando `SKILL_ID` esta definido:
+Os guardrails sao montados em `agent/run_standalone.py`:
 
 ```python
 # run_standalone.py (simplificado)
 middleware = []
 
+# Camada 1: AAP SDK — sempre ativo (PII detection)
+from cockpit_aap import GuardrailMiddleware, RegexGuardrailAdapter
+sdk_guardrail = GuardrailMiddleware(guardrail=RegexGuardrailAdapter(), module_id="open-swe")
+middleware.append(sdk_guardrail)
+
+# Camada 2: Manifest — sempre ativo (regex patterns do YAML)
+from agent.middleware.manifest_guardrails import create_manifest_input_guardrail, create_manifest_output_guardrail
+manifest_input = create_manifest_input_guardrail()   # rm -rf, DROP TABLE, etc.
+manifest_output = create_manifest_output_guardrail()  # api_key=, AKIA*, sk-*, ghp_*
+if manifest_input:
+    middleware.append(manifest_input)
+if manifest_output:
+    middleware.append(manifest_output)
+
+# Camada 3: Skill middleware — apenas quando SKILL_ID esta definido
 if skill_id:
-    # 1. File scope (before_model)
     file_scope_mw = create_skill_file_scope_middleware(skill_id)
     if file_scope_mw:
         middleware.append(file_scope_mw)
-
-    # 2. Secret filter (after_agent) — sempre ativo
     middleware.append(secret_filter)
-
-    # 3. Output validator (after_agent)
     output_mw = create_output_validator(skill_id)
     if output_mw:
         middleware.append(output_mw)
 
-agent = create_deep_agent(
-    model=model,
-    system_prompt=system_prompt,
-    backend=sandbox,
-    middleware=middleware,
-)
+agent = create_deep_agent(model=model, middleware=middleware, ...)
 ```
 
-Para o `swe-coder` (agente base sem skill), os guardrails de skill nao rodam.
-O `server.py` (modo LangGraph) usa os 4 middleware originais do Open SWE.
+**Para o `swe-coder`:** As camadas 1 e 2 rodam (PII + manifest). A camada 3 (skill) nao.
+**Para skills:** Todas as 3 camadas rodam.
+**Para o modo LangGraph (`server.py`):** Usa os 4 middleware originais do Open SWE.
 
 ---
 
@@ -382,11 +465,14 @@ source .env && pytest -m e2e -v
 
 | Arquivo | Tipo | Descricao |
 |---------|------|-----------|
-| `agent/middleware/skill_file_scope.py` | Guardrail | Controle de escopo de arquivos por skill |
-| `agent/middleware/secret_filter.py` | Guardrail | Redacao de secrets no output |
-| `agent/middleware/output_validator.py` | Guardrail | Validacao de JSON estruturado |
+| `.aap/open-swe/manifest.yaml` | Config | Regex patterns declarativos (input + output guardrails) |
+| `agent/aap_config.py` | Accessors | `get_input_guardrails()`, `get_output_guardrails()` — le do manifest |
+| `agent/middleware/manifest_guardrails.py` | Camada 2 | Compila patterns do manifest em middleware LangChain |
+| `agent/middleware/skill_file_scope.py` | Camada 3 | Controle de escopo de arquivos por skill |
+| `agent/middleware/secret_filter.py` | Camada 3 | Redacao de secrets extras no output (Bearer, connection strings) |
+| `agent/middleware/output_validator.py` | Camada 3 | Validacao de JSON estruturado |
 | `agent/middleware/__init__.py` | Registry | Exporta todos os middleware |
-| `agent/run_standalone.py` | Pipeline | Monta o middleware stack por skill |
+| `agent/run_standalone.py` | Pipeline | Monta as 3 camadas de guardrails |
 | `tests/test_guardrails.py` | Teste | 29 testes unitarios |
 | `tests/test_guardrails_integration.py` | Teste | 26 testes de integracao |
 | `tests/test_guardrails_e2e.py` | Teste | 3 testes E2E com LLM real |

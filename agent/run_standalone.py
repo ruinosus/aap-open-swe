@@ -129,8 +129,38 @@ Use the execute tool for all git operations.
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    # Build middleware stack based on skill type
+    # Build middleware stack — manifest guardrails always active,
+    # skill-specific guardrails added when SKILL_ID is set.
     middleware = []
+
+    # AAP SDK guardrail middleware (PII detection: email, CPF, phone, credit card)
+    try:
+        from cockpit_aap import GuardrailMiddleware, RegexGuardrailAdapter
+
+        sdk_adapter = RegexGuardrailAdapter()
+        sdk_guardrail = GuardrailMiddleware(
+            guardrail=sdk_adapter, module_id="open-swe", agent_id=skill_id or "swe-coder"
+        )
+        middleware.append(sdk_guardrail)
+        logger.info("Added AAP SDK guardrail middleware (PII detection)")
+    except Exception:
+        logger.warning("Could not load AAP SDK guardrail middleware", exc_info=True)
+
+    # Manifest guardrails (regex patterns from .aap/open-swe/manifest.yaml)
+    from agent.middleware.manifest_guardrails import (
+        create_manifest_input_guardrail,
+        create_manifest_output_guardrail,
+    )
+
+    manifest_input_mw = create_manifest_input_guardrail()
+    if manifest_input_mw:
+        middleware.append(manifest_input_mw)
+
+    manifest_output_mw = create_manifest_output_guardrail()
+    if manifest_output_mw:
+        middleware.append(manifest_output_mw)
+
+    # Skill-specific guardrails — only when SKILL_ID is set
     if skill_id and skill_id not in ("swe-coder", ""):
         from agent.middleware.output_validator import create_output_validator
         from agent.middleware.secret_filter import secret_filter
