@@ -326,7 +326,7 @@ def test_get_slack_repo_config_github_url_beats_thread_metadata(
 def test_get_slack_repo_config_repo_name_only_defaults_org(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """repo:name without org should default owner to langchain-ai."""
+    """repo:name without org should default owner to DEFAULT_REPO_OWNER."""
     threads_client = _FakeThreadsClient(raise_not_found=True)
 
     async def fake_post_slack_thread_reply(channel_id: str, thread_ts: str, text: str) -> bool:
@@ -334,6 +334,9 @@ def test_get_slack_repo_config_repo_name_only_defaults_org(
 
     monkeypatch.setattr(webapp, "get_client", lambda url: _FakeClient(threads_client))
     monkeypatch.setattr(webapp, "post_slack_thread_reply", fake_post_slack_thread_reply)
+    monkeypatch.setattr(webapp, "DEFAULT_REPO_OWNER", "langchain-ai")
+    monkeypatch.setattr(webapp, "SLACK_REPO_OWNER", "langchain-ai")
+    monkeypatch.setattr(webapp, "SLACK_REPO_NAME", "langchainplus")
 
     repo = asyncio.run(
         webapp.get_slack_repo_config("fix bug in repo:langchainplus", "C123", "1.234")
@@ -345,7 +348,7 @@ def test_get_slack_repo_config_repo_name_only_defaults_org(
 def test_get_slack_repo_config_repo_name_only_space_syntax(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """repo name (space syntax, no org) should default owner to langchain-ai."""
+    """repo name (space syntax, no org) should default owner to DEFAULT_REPO_OWNER."""
     threads_client = _FakeThreadsClient(raise_not_found=True)
 
     async def fake_post_slack_thread_reply(channel_id: str, thread_ts: str, text: str) -> bool:
@@ -353,6 +356,9 @@ def test_get_slack_repo_config_repo_name_only_space_syntax(
 
     monkeypatch.setattr(webapp, "get_client", lambda url: _FakeClient(threads_client))
     monkeypatch.setattr(webapp, "post_slack_thread_reply", fake_post_slack_thread_reply)
+    monkeypatch.setattr(webapp, "DEFAULT_REPO_OWNER", "langchain-ai")
+    monkeypatch.setattr(webapp, "SLACK_REPO_OWNER", "langchain-ai")
+    monkeypatch.setattr(webapp, "SLACK_REPO_NAME", "open-swe")
 
     repo = asyncio.run(webapp.get_slack_repo_config("fix bug in repo open-swe", "C123", "1.234"))
 

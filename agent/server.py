@@ -26,6 +26,13 @@ from deepagents import create_deep_agent
 from deepagents.backends.protocol import SandboxBackendProtocol
 from langsmith.sandbox import SandboxClientError
 
+from .aap_config import (
+    get_agent_instruction,
+    get_model_id,
+    get_model_max_tokens,
+    get_model_temperature,
+    get_recursion_limit,
+)
 from .middleware import (
     ToolErrorMiddleware,
     check_message_queue_before_model,
@@ -41,7 +48,6 @@ from .tools import (
     linear_comment,
     slack_thread_reply,
 )
-from .aap_config import get_agent_instruction, get_model_id, get_model_max_tokens, get_model_temperature, get_recursion_limit
 from .utils.auth import resolve_github_token
 from .utils.model import make_model
 from .utils.sandbox import create_sandbox

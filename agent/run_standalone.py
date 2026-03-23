@@ -8,7 +8,6 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 import sys
 
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
@@ -100,7 +99,8 @@ Use the execute tool for all git operations.
 
     messages = result.get("messages", [])
     ai_messages = [
-        m for m in messages
+        m
+        for m in messages
         if hasattr(m, "content") and getattr(m, "type", "") == "ai" and m.content
     ]
 
@@ -126,10 +126,6 @@ Use the execute tool for all git operations.
     branch_name = f"aap-open-swe/issue-{issue_number}"
 
     if has_changes:
-        # Check if agent already committed
-        log_result = sandbox.execute("git log --oneline -1")
-        unpushed = sandbox.execute("git log --oneline @{u}..HEAD 2>/dev/null")
-
         if status_result.output and status_result.output.strip():
             # Uncommitted changes — commit them
             sandbox.execute("git add -A")

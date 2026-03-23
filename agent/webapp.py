@@ -14,6 +14,16 @@ from langchain_core.messages.content import create_text_block
 from langgraph_sdk import get_client
 from langgraph_sdk.client import LangGraphClient
 
+from .aap_config import (
+    get_allowed_github_orgs,
+    get_default_repo_name,
+    get_default_repo_owner,
+    get_langgraph_url,
+    get_slack_bot_user_id,
+    get_slack_bot_username,
+    get_slack_repo_name,
+    get_slack_repo_owner,
+)
 from .utils.auth import (
     is_bot_token_only_mode,
     persist_encrypted_github_token,
@@ -53,17 +63,6 @@ from .utils.slack import (
 )
 
 logger = logging.getLogger(__name__)
-
-from .aap_config import (
-    get_allowed_github_orgs,
-    get_default_repo_name,
-    get_default_repo_owner,
-    get_langgraph_url,
-    get_slack_bot_user_id,
-    get_slack_bot_username,
-    get_slack_repo_name,
-    get_slack_repo_owner,
-)
 
 app = FastAPI()
 

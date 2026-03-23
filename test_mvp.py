@@ -120,7 +120,7 @@ async def test_agent_creation():
     temperature = get_model_temperature()
     max_tokens = get_model_max_tokens()
 
-    model = make_model(model_id, temperature=temperature, max_tokens=max_tokens)
+    make_model(model_id, temperature=temperature, max_tokens=max_tokens)
     print(f"  ✓ Model created: {model_id} (temp={temperature}, max_tokens={max_tokens})")
 
     instr = get_agent_instruction()
@@ -182,7 +182,14 @@ async def test_agent_invocation():
         print("  → Sending task: 'List files and read hello.py'...")
 
         result = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": f"List files in {tmpdir} and show me what's in hello.py. Then run it with: python3 -c \"import sys; sys.path.insert(0, '{tmpdir}'); from hello import greet; print(greet('Open SWE'))\""}]},
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"List files in {tmpdir} and show me what's in hello.py. Then run it with: python3 -c \"import sys; sys.path.insert(0, '{tmpdir}'); from hello import greet; print(greet('Open SWE'))\"",
+                    }
+                ]
+            },
         )
 
         messages = result.get("messages", [])
@@ -193,7 +200,11 @@ async def test_agent_invocation():
         print(f"  ✓ Agent made {len(tool_calls)} tool call(s)")
 
         # Print last AI message
-        ai_messages = [m for m in messages if hasattr(m, "content") and getattr(m, "type", "") == "ai" and m.content]
+        ai_messages = [
+            m
+            for m in messages
+            if hasattr(m, "content") and getattr(m, "type", "") == "ai" and m.content
+        ]
         if ai_messages:
             last = ai_messages[-1].content
             preview = last[:200] if isinstance(last, str) else str(last)[:200]

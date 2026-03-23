@@ -77,6 +77,7 @@ def _artifact_int(key: str, env_var: str = "", default: int = 0) -> int:
 
 # ─── Model Configuration ────────────────────────────────────
 
+
 def get_model_id() -> str:
     return _artifact("open-swe.config.model", "OPEN_SWE_MODEL", "anthropic:claude-opus-4-6")
 
@@ -95,6 +96,7 @@ def get_model_max_tokens() -> int:
 
 # ─── Repository Configuration ───────────────────────────────
 
+
 def get_default_repo_owner() -> str:
     return _artifact("open-swe.config.default_repo_owner", "DEFAULT_REPO_OWNER", "")
 
@@ -104,14 +106,21 @@ def get_default_repo_name() -> str:
 
 
 def get_slack_repo_owner() -> str:
-    return _artifact("open-swe.config.slack_repo_owner", "SLACK_REPO_OWNER", "") or get_default_repo_owner()
+    return (
+        _artifact("open-swe.config.slack_repo_owner", "SLACK_REPO_OWNER", "")
+        or get_default_repo_owner()
+    )
 
 
 def get_slack_repo_name() -> str:
-    return _artifact("open-swe.config.slack_repo_name", "SLACK_REPO_NAME", "") or get_default_repo_name()
+    return (
+        _artifact("open-swe.config.slack_repo_name", "SLACK_REPO_NAME", "")
+        or get_default_repo_name()
+    )
 
 
 # ─── Slack Configuration ────────────────────────────────────
+
 
 def get_slack_bot_user_id() -> str:
     return _artifact("open-swe.config.slack_bot_user_id", "SLACK_BOT_USER_ID", "")
@@ -123,6 +132,7 @@ def get_slack_bot_username() -> str:
 
 # ─── GitHub Configuration ───────────────────────────────────
 
+
 def get_allowed_github_orgs() -> frozenset[str]:
     raw = _artifact("open-swe.config.allowed_github_orgs", "ALLOWED_GITHUB_ORGS", "")
     if not raw:
@@ -132,11 +142,13 @@ def get_allowed_github_orgs() -> frozenset[str]:
 
 # ─── Sandbox Configuration ──────────────────────────────────
 
+
 def get_sandbox_type() -> str:
     return _artifact("open-swe.config.sandbox_type", "SANDBOX_TYPE", "langsmith")
 
 
 # ─── LangGraph Configuration ────────────────────────────────
+
 
 def get_langgraph_url() -> str:
     return _artifact(
@@ -152,6 +164,7 @@ def get_recursion_limit() -> int:
 
 # ─── Mapping Configuration ──────────────────────────────────
 
+
 def get_linear_team_to_repo() -> dict:
     return _artifact_json("open-swe.mappings.linear_team_to_repo", "LINEAR_TEAM_TO_REPO_JSON", {})
 
@@ -161,6 +174,7 @@ def get_github_user_email_map() -> dict:
 
 
 # ─── Agent Instruction ──────────────────────────────────────
+
 
 def get_agent_instruction() -> str:
     mi = get_manifest()
@@ -173,6 +187,7 @@ def get_agent_instruction() -> str:
 
 
 # ─── i18n ────────────────────────────────────────────────────
+
 
 def get_i18n_message(key: str, locale: str = "", **kwargs) -> str:
     mi = get_manifest()
@@ -191,6 +206,7 @@ def get_i18n_message(key: str, locale: str = "", **kwargs) -> str:
 
 # ─── Connections ─────────────────────────────────────────────
 
+
 def get_connection_endpoint(connection_id: str) -> str:
     mi = get_manifest()
     if mi is not None:
@@ -204,6 +220,7 @@ def get_connection_endpoint(connection_id: str) -> str:
 
 
 # ─── Telemetry ───────────────────────────────────────────────
+
 
 def is_telemetry_enabled() -> bool:
     mi = get_manifest()
@@ -231,6 +248,7 @@ def get_telemetry_service_name() -> str:
 
 # ─── Rules ───────────────────────────────────────────────────
 
+
 def get_rules() -> list:
     mi = get_manifest()
     if mi is not None:
@@ -242,13 +260,11 @@ def get_rules() -> list:
 
 
 def get_rules_for_agent(agent_id: str = "swe-coder") -> list:
-    return [
-        r for r in get_rules()
-        if not r.applies_to or agent_id in (r.applies_to or [])
-    ]
+    return [r for r in get_rules() if not r.applies_to or agent_id in (r.applies_to or [])]
 
 
 # ─── Guardrails ─────────────────────────────────────────────
+
 
 def get_guardrails() -> dict:
     mi = get_manifest()
