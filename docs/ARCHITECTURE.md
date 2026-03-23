@@ -241,15 +241,26 @@ Git Operations:
 | `max-file-size` | warn | Files > 500 KB |
 | `no-backup-files` | block | No .bak files |
 
-### Guardrails (4 built-in)
+### Guardrails
 
-**Input** (2):
-- Block destructive commands (`rm -rf /`, `DROP TABLE`, etc.)
-- Block unsafe execution patterns (`curl | sh`, `eval()`)
+**Manifest Guardrails** (4 built-in, in `manifest.yaml`):
 
-**Output** (2):
-- Block credentials in output (`password=`, `api_key=`)
-- Block cloud provider keys (`AKIA...`, `sk-...`, `ghp_...`)
+| Type | Action | Pattern |
+|------|--------|---------|
+| Input | Block | Destructive commands (`rm -rf /`, `DROP TABLE`) |
+| Input | Block | Unsafe execution (`curl \| sh`, `eval()`) |
+| Output | Block | Credentials (`password=`, `api_key=`) |
+| Output | Block | Cloud keys (`AKIA...`, `sk-...`, `ghp_...`) |
+
+**Skill Middleware Guardrails** (3, in `agent/middleware/`):
+
+| Guardrail | Type | What it does |
+|-----------|------|-------------|
+| `skill_file_scope` | `@before_model` | Blocks writes outside skill scope (review = read-only, project-docs = .md only) |
+| `secret_filter` | `@after_agent` | Redacts API keys, tokens, passwords from agent output |
+| `output_validator` | `@after_agent` | Validates JSON structure before posting to GitHub |
+
+See [GUARDRAILS.md](GUARDRAILS.md) for full documentation, testing strategy, and how to create new guardrails.
 
 ## Setup Guide
 
