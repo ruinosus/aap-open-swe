@@ -5,6 +5,8 @@ on:
     types: [created]
   issues:
     types: [opened, assigned, labeled]
+  pull_request:
+    types: [opened, synchronize, closed]
 
 permissions:
   contents: write
@@ -68,6 +70,17 @@ jobs:
             // Remove the @aap-open-swe mention and trim
             const task = body.replace(/@aap-open-swe/gi, '').trim();
 
+            // Detect skill commands
+            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests)\b/i);
+            const skillMap = {
+              'review': 'code-review',
+              'security': 'security-scan',
+              'docs': 'doc-generator',
+              'tests': 'test-generator',
+            };
+            const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
+            core.setOutput('skill_id', skillId);
+
             // Get issue title and body for context
             const issue = context.payload.issue;
             const fullTask = `Issue #${issue.number}: ${issue.title}\n\n${issue.body || ''}\n\nUser request: ${task}`;
@@ -79,10 +92,12 @@ jobs:
         id: agent
         env:
           TASK: ${{ steps.extract.outputs.task }}
+          SKILL_ID: ${{ steps.extract.outputs.skill_id }}
           REPO_DIR: ${{ github.workspace }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -595,5 +610,241 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
+              body: comment
+            });
+
+  # ─── Trigger 6: PR opened/updated → code-review + security-scan ──
+  run-review:
+    if: |
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'opened' || github.event.action == 'synchronize')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv sync --all-extras
+          uv pip install cockpit-aap-sdk
+
+      - name: Run code review
+        env:
+          SKILL_ID: code-review
+          TASK: "Review the PR diff and provide inline feedback"
+          REPO_DIR: ${{ github.workspace }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
+          SANDBOX_TYPE: local
+        run: |
+          source .venv/bin/activate
+          PYTHONPATH=. python agent/run_standalone.py
+
+      - name: Run security scan
+        env:
+          SKILL_ID: security-scan
+          TASK: "Scan the PR diff for security vulnerabilities"
+          REPO_DIR: ${{ github.workspace }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
+          SANDBOX_TYPE: local
+        run: |
+          source .venv/bin/activate
+          PYTHONPATH=. python agent/run_standalone.py
+
+  # ─── Trigger 7: PR merged to main → doc-generator ──
+  run-doc-gen:
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv sync --all-extras
+          uv pip install cockpit-aap-sdk
+
+      - name: Run doc generator
+        id: agent
+        env:
+          SKILL_ID: doc-generator
+          TASK: "Analyze recent changes and generate/update documentation"
+          REPO_DIR: ${{ github.workspace }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
+          SANDBOX_TYPE: local
+        run: |
+          source .venv/bin/activate
+          PYTHONPATH=. python agent/run_standalone.py
+
+      - name: Create Pull Request
+        if: steps.agent.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.agent.outputs.branch_name }}';
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'docs: auto-update documentation',
+              body: '## Description\nAutomated documentation update by AAP Open SWE agent (doc-generator skill).',
+              head: branch,
+              base: 'main',
+              draft: true
+            });
+            core.info(`Doc PR created: ${pr.html_url}`);
+
+  # ─── Trigger 8: Label 'needs-tests' → test-generator ──
+  run-test-gen:
+    if: |
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'needs-tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: React to issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              content: 'eyes'
+            });
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv sync --all-extras
+          uv pip install cockpit-aap-sdk
+
+      - name: Run test generator
+        id: agent
+        env:
+          SKILL_ID: test-generator
+          TASK: "Generate unit tests for code with low or no test coverage"
+          REPO_DIR: ${{ github.workspace }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          PR_NUMBER: "0"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
+          SANDBOX_TYPE: local
+        run: |
+          source .venv/bin/activate
+          PYTHONPATH=. python agent/run_standalone.py
+
+      - name: Create Pull Request
+        if: steps.agent.outputs.has_changes == 'true'
+        id: create-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ steps.agent.outputs.branch_name }}';
+            const issueNumber = ${{ github.event.issue.number }};
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `test: add tests for issue #${issueNumber}`,
+              body: `## Description\nAutomated test generation for #${issueNumber} by AAP Open SWE agent (test-generator skill).\n\nCloses #${issueNumber}`,
+              head: branch,
+              base: 'main',
+              draft: true
+            });
+            core.setOutput('pr_url', pr.html_url);
+
+      - name: Comment on issue
+        env:
+          AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ github.event.issue.number }};
+            const hasChanges = '${{ steps.agent.outputs.has_changes }}' === 'true';
+            const prUrl = '${{ steps.create-pr.outputs.pr_url }}' || '';
+            const agentResponse = (process.env.AGENT_RESPONSE || '').slice(0, 5000);
+            let comment;
+            if (hasChanges && prUrl) {
+              comment = `### AAP Open SWE Agent — Test Generator\n\nI've generated tests and opened a draft PR:\n${prUrl}\n\n<details>\n<summary>Agent output</summary>\n\n${agentResponse}\n\n</details>`;
+            } else {
+              comment = `### AAP Open SWE Agent — Test Generator\n\n${agentResponse || 'I analyzed the code but could not generate tests.'}`;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
               body: comment
             });

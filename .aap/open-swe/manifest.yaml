@@ -49,6 +49,40 @@ spec:
         - slack_thread_reply
         - github_comment
 
+  # ─── Skills ──────────────────────────────────────────────
+  skills:
+    - id: code-review
+      name: Code Review
+      description: Reviews PR diffs for bugs, logic errors, code smells, and standards adherence
+      instruction: skills/code-review.md
+      trigger: pull_request
+      auto_invoke:
+        triggers: ["review", "code review", "PR review", "review this"]
+
+    - id: security-scan
+      name: Security Scan
+      description: Scans PR diffs for OWASP Top 10, hardcoded secrets, CVEs, and injection patterns
+      instruction: skills/security-scan.md
+      trigger: pull_request
+      auto_invoke:
+        triggers: ["security", "vulnerability", "CVE", "secrets", "security scan"]
+
+    - id: doc-generator
+      name: Doc Generator
+      description: Generates and updates documentation for new or modified code
+      instruction: skills/doc-generator.md
+      trigger: push_main
+      auto_invoke:
+        triggers: ["docs", "documentation", "generate docs", "update docs"]
+
+    - id: test-generator
+      name: Test Generator
+      description: Generates unit tests for code with low or no test coverage
+      instruction: skills/test-generator.md
+      trigger: label_needs_tests
+      auto_invoke:
+        triggers: ["tests", "test coverage", "generate tests", "needs-tests", "add tests"]
+
   # ─── Artifacts (Configuration) ─────────────────────────────
   artifacts:
     # Model configuration
@@ -295,7 +329,11 @@ spec:
     roadmap:
       - id: aap-sdk-integration
         title: AAP SDK manifest-driven configuration
-        status: in-progress
+        status: completed
+        priority: high
+      - id: dynamic-skills
+        title: Dynamic skills — code-review, security-scan, doc-generator, test-generator
+        status: completed
         priority: high
       - id: multi-agent-orchestration
         title: Multi-agent task decomposition with specialized sub-agents

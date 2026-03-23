@@ -24,6 +24,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
+        get_skill_instruction,
     )
     from agent.utils.model import make_model
 
@@ -47,20 +48,41 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         max_tokens=get_model_max_tokens(),
     )
 
-    # Build system prompt from manifest
-    manifest_instruction = get_agent_instruction()
-    if manifest_instruction:
-        system_prompt = manifest_instruction.format(
-            working_dir=repo_dir,
-            linear_project_id="",
-            linear_issue_number="",
-            agents_md_section="",
-        )
-    else:
-        system_prompt = (
-            f"You are a coding assistant. Your working directory is {repo_dir}. "
-            "Use the execute tool to run commands. Be concise and focused."
-        )
+    # Check for skill-specific execution
+    skill_id = os.environ.get("SKILL_ID", "")
+    pr_number = int(os.environ.get("PR_NUMBER", "0"))
+
+    # Build system prompt — skill overrides base if specified
+    if skill_id and skill_id not in ("swe-coder", ""):
+        skill_instruction = get_skill_instruction(skill_id)
+        if skill_instruction:
+            system_prompt = skill_instruction.format(
+                working_dir=repo_dir,
+                repo_owner=repo_owner,
+                repo_name=repo_name,
+                pr_number=pr_number,
+                issue_number=issue_number,
+            )
+        else:
+            logger.warning("Skill %s not found, falling back to swe-coder", skill_id)
+            skill_id = ""  # fall through to default
+            system_prompt = ""
+
+    if not skill_id or skill_id == "swe-coder":
+        # Default swe-coder behavior
+        manifest_instruction = get_agent_instruction()
+        if manifest_instruction:
+            system_prompt = manifest_instruction.format(
+                working_dir=repo_dir,
+                linear_project_id="",
+                linear_issue_number="",
+                agents_md_section="",
+            )
+        else:
+            system_prompt = (
+                f"You are a coding assistant. Your working directory is {repo_dir}. "
+                "Use the execute tool to run commands. Be concise and focused."
+            )
 
     # Add GitHub Actions context to the prompt
     system_prompt += f"""
@@ -111,6 +133,16 @@ Use the execute tool for all git operations.
         agent_response = last if isinstance(last, str) else json.dumps(last, indent=2)
 
     logger.info("Agent finished with %d messages", len(messages))
+
+    # Post review if skill is review-type
+    if skill_id in ("code-review", "security-scan") and pr_number:
+        from agent.review_poster import parse_review_output, post_pr_review
+
+        review = parse_review_output(agent_response)
+        if review:
+            post_pr_review(repo_owner, repo_name, pr_number, review, skill_id)
+        else:
+            logger.warning("Could not parse structured review from agent output")
 
     # Check if agent made changes
     diff_result = sandbox.execute("git diff --stat HEAD")

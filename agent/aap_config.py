@@ -284,3 +284,50 @@ def get_input_guardrails() -> list:
 
 def get_output_guardrails() -> list:
     return get_guardrails().get("output", [])
+
+
+# ─── Skills ────────────────────────────────────────────────
+
+
+def get_skills() -> list:
+    """Get all skills from manifest."""
+    mi = get_manifest()
+    if mi is not None:
+        try:
+            return mi.skills()
+        except Exception:
+            logger.warning("Failed to load skills from manifest", exc_info=True)
+    return []
+
+
+def get_skill(skill_id: str):
+    """Get a specific skill by ID."""
+    mi = get_manifest()
+    if mi is not None:
+        try:
+            return mi.skill(skill_id)
+        except Exception:
+            pass
+    return None
+
+
+def get_skill_instruction(skill_id: str) -> str:
+    """Get the instruction content for a skill."""
+    skill = get_skill(skill_id)
+    if skill and skill.instruction:
+        if isinstance(skill.instruction, str):
+            return skill.instruction
+    return ""
+
+
+def get_skill_adapter():
+    """Create a ManifestSkillAdapter from manifest skills."""
+    if not _HAS_AAP_SDK:
+        return None
+    try:
+        from cockpit_aap import create_manifest_skill_adapter
+
+        return create_manifest_skill_adapter(get_skills())
+    except Exception:
+        logger.warning("Failed to create skill adapter", exc_info=True)
+        return None
