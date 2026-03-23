@@ -106,9 +106,13 @@ Do NOT call commit_and_open_pr or github_comment tools — they are not availabl
 Use the execute tool for all git operations.
 """
 
-    # Build response_format for skill-based executions (structured output)
+    # Build response_format for review-type skills (structured output).
+    # PR-type skills (doc-generator, test-generator, project-docs) need tool
+    # calling to execute git commands, so they must NOT use response_format
+    # which forces immediate JSON return without tool use.
     response_format = None
-    if skill_id and skill_id not in ("swe-coder", ""):
+    review_skills = ("code-review", "security-scan")
+    if skill_id in review_skills:
         try:
             from langchain.agents.structured_output import ProviderStrategy
 
