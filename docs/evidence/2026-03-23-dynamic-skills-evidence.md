@@ -135,28 +135,48 @@ Created PR #7 (`test/skills-e2e`) with an intentional test file containing:
 
 ```
 agent.aap_config | Loaded AAP manifest from .aap/open-swe
+run_standalone | Using structured output schema: ReviewOutput
 run_standalone | Creating agent with model=openai:gpt-4o
 run_standalone | Sending task to agent: Review the PR diff and provide inline feedback
+run_standalone | Got structured_response from agent
 run_standalone | Agent finished with 4 messages
-run_standalone | Could not parse structured review from agent output
+run_standalone | Using structured_response for review posting
+review_poster | Posted PR review with 4 comments
 
+run_standalone | Using structured output schema: ReviewOutput
 run_standalone | Creating agent with model=openai:gpt-4o
 run_standalone | Sending task to agent: Scan the PR diff for security vulnerabilities
+run_standalone | Got structured_response from agent
 run_standalone | Agent finished with 4 messages
-run_standalone | Could not parse structured review from agent output
+run_standalone | Using structured_response for review posting
+review_poster | Posted PR review with 3 comments
 ```
+
+### PR Review Results
+
+**Code Review** (Score: 3/10, 4 inline comments):
+
+| File | Line | Severity | Finding |
+|------|------|----------|---------|
+| `test_skills_e2e.py` | 12 | CRITICAL | SQL injection — user input concatenated into SQL query |
+| `test_skills_e2e.py` | 18 | CRITICAL | Hardcoded secret — API key stored in source code |
+| `test_skills_e2e.py` | 24 | HIGH | Division by zero — no validation on discount parameter |
+| `test_skills_e2e.py` | 29 | CRITICAL | Command injection — shell=True with unsanitized input |
+
+**Security Scan** (Score: 3/10, 3 inline comments):
+
+| File | Line | Severity | Finding |
+|------|------|----------|---------|
+| `test_skills_e2e.py` | 11 | CRITICAL | CWE-89: SQL Injection |
+| `test_skills_e2e.py` | 18 | HIGH | Hardcoded API Key |
+| `test_skills_e2e.py` | 28 | CRITICAL | CWE-78: Command Injection |
 
 ### Analysis
 
 - **Workflow infrastructure**: Fully operational. Triggers, skill loading, and agent execution all work.
-- **Review posting**: Agent ran but GPT-4o did not return structured JSON in the expected format. This is expected — the model fell back to `openai:gpt-4o` because `ANTHROPIC_API_KEY` is not configured in the repo secrets. With `anthropic:claude-sonnet-4-6` configured, the structured JSON output will work correctly.
+- **Structured output**: `ProviderStrategy(strict=True)` with Pydantic schemas guarantees valid JSON from GPT-4o (100% reliability via OpenAI's constrained decoding).
+- **Review posting**: Both code-review and security-scan successfully posted inline comments via GitHub Reviews API.
 - **Job routing**: All jobs correctly evaluated their `if` conditions — only `run-review` triggered for a `pull_request` event.
-
-### Required for Full E2E
-
-To enable inline PR comments with Claude:
-1. Add `ANTHROPIC_API_KEY` to repository secrets
-2. Set `OPEN_SWE_MODEL` repository variable to `anthropic:claude-sonnet-4-6`
 
 ---
 
@@ -197,27 +217,66 @@ Skills are fully declarative. The `ManifestSkillAdapter` from `cockpit-aap-sdk` 
 
 ---
 
-## 8. Commits
+## 8. Structured Output Strategy
+
+To guarantee valid JSON from any LLM (GPT-4o, Claude, etc.), the system uses a 3-layer approach:
+
+### Layer 1: Pydantic Schemas + ProviderStrategy (primary)
+
+```python
+from langchain.agents.structured_output import ProviderStrategy
+from agent.schemas import ReviewOutput
+
+response_format = ProviderStrategy(schema=ReviewOutput, strict=True)
+agent = create_deep_agent(..., response_format=response_format)
+```
+
+OpenAI's constrained decoding guarantees 100% valid JSON matching the schema. The `additionalProperties: false` flag is set on all schemas for OpenAI compatibility.
+
+### Layer 2: Robust Parser (fallback)
+
+`parse_review_output()` uses 4 strategies to find valid JSON:
+1. Direct JSON parse (whole response)
+2. Markdown code block extraction
+3. Brace-matching (outermost `{...}`)
+4. Regex pattern matching
+
+### Layer 3: Prompt Reinforcement
+
+All skill instruction files include: "Your final response MUST be ONLY a valid JSON object — no prose, no code fences."
+
+### References
+
+- [LangChain Structured Output](https://docs.langchain.com/oss/python/langchain/structured-output)
+- [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
+- [Structured Output in LangGraph](https://stuart.mchattie.net/posts/2026/01/31/structured-output-in-langgraph/)
+- [DeepAgents response_format](https://github.com/langchain-ai/deepagents/issues/330)
+
+---
+
+## 9. Commits
 
 | Hash | Message |
 |------|---------|
 | `786f1e9` | `feat: add 4 dynamic skills (code-review, security-scan, doc-gen, test-gen)` |
 | `6094191` | `fix: use string replace instead of .format() for skill instructions` |
+| `ebb2c86` | `feat: add structured output via ProviderStrategy for reliable JSON` |
+| `ba63ca9` | `fix: add additionalProperties:false to schemas for OpenAI compatibility` |
 
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 
-The dynamic skills system is fully implemented and validated:
+The dynamic skills system is fully implemented, validated, and working E2E:
 
 - **4 skills** declared in manifest with instruction markdown files
-- **12 new tests** passing (97 total, 0 failures)
+- **16 new tests** passing (101 total, 0 failures)
 - **3 new workflow jobs** routing GitHub events to skills
 - **On-demand invocation** via `@aap-open-swe <skill>` comment parsing
-- **GitHub Reviews API** integration ready for inline PR comments
-- **E2E workflow** validated — triggers, skill loading, and agent execution confirmed
+- **GitHub Reviews API** posting inline comments on PRs (7 comments on test PR)
+- **Structured output** via Pydantic schemas + ProviderStrategy (100% JSON reliability)
+- **E2E validated** — PR #7 received automatic code review + security scan with inline comments
 
 **Next steps:**
-- Configure `ANTHROPIC_API_KEY` in repo secrets for Claude Sonnet integration
-- Close test PR #7 after review
+- Close test PR #7
 - Phase 2: Add `ci-fixer` and `issue-triager` skills
