@@ -68,4 +68,5 @@ SKILL_SCHEMAS: dict[str, type[BaseModel]] = {
     "security-scan": ReviewOutput,
     "doc-generator": PROutput,
     "test-generator": PROutput,
+    "project-docs": PROutput,
 }

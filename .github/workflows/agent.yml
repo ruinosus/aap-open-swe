@@ -71,12 +71,13 @@ jobs:
             const task = body.replace(/@aap-open-swe/gi, '').trim();
 
             // Detect skill commands
-            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests)\b/i);
+            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs)\b/i);
             const skillMap = {
               'review': 'code-review',
               'security': 'security-scan',
-              'docs': 'doc-generator',
+              'docs': 'project-docs',
               'tests': 'test-generator',
+              'project-docs': 'project-docs',
             };
             const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
             core.setOutput('skill_id', skillId);

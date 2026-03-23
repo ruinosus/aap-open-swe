@@ -14,6 +14,13 @@ Um **coding agent autonomo** que:
 5. Abre um **Pull Request** automaticamente
 6. Comenta na issue/thread com o resumo
 
+Alem disso, possui **5 skills dinamicas** que ativam automaticamente:
+- **Code Review** — revisa PRs com inline comments automaticos
+- **Security Scan** — detecta vulnerabilidades (OWASP Top 10, secrets, injection)
+- **Doc Generator** — gera docstrings e documentacao de codigo
+- **Test Generator** — gera testes unitarios para codigo sem cobertura
+- **Project Docs** — atualiza os .md do projeto (README, ARCHITECTURE, etc.)
+
 Built on [LangGraph](https://langchain-ai.github.io/langgraph/) + [Deep Agents](https://github.com/langchain-ai/deepagents).
 
 ## Quick Start
@@ -91,6 +98,8 @@ The `agent/aap_config.py` module provides 25+ typed accessor functions:
 from agent.aap_config import (
     get_model_id,           # "openai:gpt-4o"
     get_agent_instruction,  # 10K+ chars system prompt
+    get_skills,             # [ManifestSkill(...), ...] — 5 skills
+    get_skill_adapter,      # ManifestSkillAdapter for trigger detection
     get_rules,              # [ManifestRule(...), ...]
     get_guardrails,         # {"input": [...], "output": [...]}
     is_telemetry_enabled,   # True
@@ -102,18 +111,34 @@ If `cockpit-aap-sdk` is not installed, everything falls back to env vars seamles
 ## Architecture
 
 ```
-.aap/open-swe/manifest.yaml     <- Declarative config (source of truth)
+.aap/open-swe/manifest.yaml     <- Declarative config (agents, skills, rules, ...)
     |
 agent/aap_config.py              <- Config layer (manifest -> env var -> default)
     |
-agent/server.py                  <- Deep Agent creation (model + prompt + tools)
-    |
-agent/webapp.py                  <- FastAPI webhooks (GitHub, Slack, Linear)
-    |
-LangGraph Server (port 2024)     <- Agent execution runtime
+    ├── agent/server.py          <- Deep Agent creation (LangGraph server mode)
+    └── agent/run_standalone.py  <- Standalone runner (GitHub Actions mode)
+            |
+            ├── SKILL_ID env var -> skill instruction from manifest
+            ├── Pydantic schemas -> ProviderStrategy (structured JSON output)
+            └── review_poster.py -> GitHub Reviews API (inline PR comments)
     |
 Sandbox (local/cloud)            <- Isolated code execution
 ```
+
+## Skills
+
+Skills sao declarativas — adicionar uma nova requer apenas um markdown + entrada no manifest:
+
+```
+.aap/open-swe/skills/
+  code-review.md       -> PR opened     -> inline comments
+  security-scan.md     -> PR opened     -> inline comments
+  doc-generator.md     -> PR merged     -> draft PR com docs
+  test-generator.md    -> label added   -> draft PR com testes
+  project-docs.md      -> PR merged     -> draft PR com .md updates
+```
+
+On-demand via comentario: `@aap-open-swe review`, `@aap-open-swe security`, `@aap-open-swe docs`, `@aap-open-swe tests`
 
 ## Environment Variables
 

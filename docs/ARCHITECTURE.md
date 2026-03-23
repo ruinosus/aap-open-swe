@@ -58,12 +58,54 @@ This is what GitHub Actions calls.
 
 ### Step 4: Create GitHub Actions Workflow
 
-`.github/workflows/agent.yml` defines 5 trigger types, each running the same
-agent pipeline but triggered by different GitHub events.
+`.github/workflows/agent.yml` defines 8 trigger types — 5 for the base swe-coder agent
+and 3 for dynamic skills (code-review, security-scan, doc-gen, test-gen, project-docs).
+
+### Step 5: Add Dynamic Skills
+
+We added a manifest-driven skill system where adding a new behavior requires zero Python:
+
+- **`.aap/open-swe/skills/*.md`** — Skill instruction files (system prompts)
+- **`agent/schemas.py`** — Pydantic schemas for structured JSON output
+- **`agent/review_poster.py`** — GitHub Reviews API integration (inline PR comments)
+- **`agent/aap_config.py`** — Added `get_skills()`, `get_skill_adapter()`, etc.
+- **`agent/run_standalone.py`** — Added `SKILL_ID` env var + `response_format` for structured output
+
+## Skills System
+
+### 5 Built-in Skills
+
+| Skill | Auto Trigger | On-Demand | Output |
+|-------|-------------|-----------|--------|
+| `code-review` | PR opened/synchronize | `@aap-open-swe review` | Inline PR comments + summary |
+| `security-scan` | PR opened/synchronize | `@aap-open-swe security` | Inline PR comments + severity |
+| `doc-generator` | PR merged to main | `@aap-open-swe docstrings` | Draft PR with docstrings |
+| `test-generator` | Label `needs-tests` | `@aap-open-swe tests` | Draft PR with tests |
+| `project-docs` | PR merged to main | `@aap-open-swe docs` | Draft PR with .md updates |
+
+### How Skills Work
+
+```
+GitHub Event → agent.yml routes to SKILL_ID
+    → run_standalone.py loads skill instruction from manifest
+    → Pydantic schema sets response_format (ProviderStrategy)
+    → Agent executes with skill-specific prompt
+    → Output: structured JSON (100% reliable via constrained decoding)
+    → Review skills → GitHub Reviews API (inline comments)
+    → PR skills → git commit + push + draft PR
+```
+
+### Adding a New Skill
+
+Zero Python required — only 2 files:
+
+1. Create `.aap/open-swe/skills/my-skill.md` (instruction prompt)
+2. Add entry to `manifest.yaml` under `skills:`
+3. (Optional) Add workflow job to `agent.yml` for auto-trigger
 
 ## Trigger System
 
-### 5 Ways to Trigger the Agent
+### 8 Ways to Trigger the Agent
 
 | # | Trigger | GitHub Event | Example |
 |---|---------|-------------|---------|
@@ -72,6 +114,9 @@ agent pipeline but triggered by different GitHub events.
 | 3 | **Issue assigned** | `issues.assigned` | Assign the issue to user `aap-open-swe` |
 | 4 | **Label added** | `issues.labeled` | Add label `aap-open-swe` to any issue |
 | 5 | **PR comment** | `issue_comment.created` | Comment `@aap-open-swe` on a Pull Request |
+| 6 | **PR review** | `pull_request.opened/sync` | Automatic code-review + security-scan |
+| 7 | **PR merged** | `pull_request.closed+merged` | Automatic doc-generator |
+| 8 | **Label needs-tests** | `issues.labeled` | Add label `needs-tests` to trigger test-generator |
 
 ### How Each Trigger Works
 
@@ -145,9 +190,15 @@ User comments on PR: "@aap-open-swe fix the linting errors"
 
 ```
 .aap/open-swe/
-  manifest.yaml              # 17 artifacts, 5 connections, 6 rules, ...
+  manifest.yaml              # agents, skills, artifacts, connections, rules, guardrails, ...
   agents/
-    swe-coder.md             # System prompt (10K+ chars)
+    swe-coder.md             # Base agent system prompt (10K+ chars)
+  skills/
+    code-review.md           # Code review skill instruction
+    security-scan.md         # Security scan skill instruction
+    doc-generator.md         # Doc generator skill instruction
+    test-generator.md        # Test generator skill instruction
+    project-docs.md          # Project docs updater skill instruction
   i18n/
     en.json                  # English (9 categories)
     pt-BR.json               # Portuguese
@@ -264,13 +315,18 @@ gh issue comment 1 --body "@aap-open-swe please implement this"
 
 | File | Purpose |
 |------|---------|
-| `.github/workflows/agent.yml` | 5-trigger GitHub Actions workflow |
-| `agent/run_standalone.py` | Standalone agent runner (no LangGraph server) |
-| `agent/aap_config.py` | Manifest config layer (25+ functions) |
+| `.github/workflows/agent.yml` | 8-trigger GitHub Actions workflow |
+| `agent/run_standalone.py` | Standalone agent runner with SKILL_ID + structured output |
+| `agent/aap_config.py` | Manifest config layer (30+ functions, incl. skill accessors) |
+| `agent/schemas.py` | Pydantic schemas for structured JSON output (ReviewOutput, PROutput) |
+| `agent/review_poster.py` | GitHub Reviews API integration (inline PR comments) |
 | `agent/server.py` | Deep Agent creation (model + prompt + tools) |
 | `agent/webapp.py` | FastAPI webhooks (for LangGraph server mode) |
 | `.aap/open-swe/manifest.yaml` | Module manifest (source of truth) |
-| `.aap/open-swe/agents/swe-coder.md` | Agent system prompt |
+| `.aap/open-swe/agents/swe-coder.md` | Base agent system prompt |
+| `.aap/open-swe/skills/*.md` | 5 skill instruction files |
 | `.aap/open-swe/i18n/en.json` | English messages |
 | `.aap/open-swe/i18n/pt-BR.json` | Portuguese messages |
 | `test_mvp.py` | 4-stage integration test |
+| `tests/test_skills.py` | Skill adapter integration tests |
+| `tests/test_review_poster.py` | Review poster unit tests |

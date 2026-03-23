@@ -69,11 +69,19 @@ spec:
 
     - id: doc-generator
       name: Doc Generator
-      description: Generates and updates documentation for new or modified code
+      description: Generates and updates code documentation (docstrings, inline docs)
       instruction: skills/doc-generator.md
       trigger: push_main
       auto_invoke:
-        triggers: ["docs", "documentation", "generate docs", "update docs"]
+        triggers: ["docstrings", "code docs", "generate docstrings"]
+
+    - id: project-docs
+      name: Project Docs
+      description: Updates project markdown files (README, ARCHITECTURE, etc.) to match current codebase
+      instruction: skills/project-docs.md
+      trigger: push_main
+      auto_invoke:
+        triggers: ["docs", "documentation", "update docs", "readme", "architecture", "project docs"]
 
     - id: test-generator
       name: Test Generator
