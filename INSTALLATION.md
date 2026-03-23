@@ -7,7 +7,7 @@ This guide walks you through setting up Open SWE end-to-end: local development, 
 
 ## Prerequisites
 
-- **Python 3.11 – 3.13** (3.14 is not yet supported due to dependency constraints)
+- **Python 3.11 – 3.14** (3.14 is not yet supported due to dependency constraints)
 - [uv](https://docs.astral.sh/uv/) package manager
 - [LangGraph CLI](https://langchain-ai.github.io/langgraph/cloud/reference/cli/)
 - [ngrok](https://ngrok.com/) (for local development — exposes webhook endpoints to the internet)

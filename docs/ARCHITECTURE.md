@@ -46,7 +46,7 @@ framework for internal coding agents. It uses LangGraph + Deep Agents for the ag
 We added manifest-driven configuration via the AAP SDK:
 
 - **`.aap/open-swe/manifest.yaml`** — All config lives here (model, connections, rules, guardrails, telemetry, i18n)
-- **`agent/aap_config.py`** — 25+ typed accessor functions that read from the manifest with env var fallback
+- **`agent/aap_config.py`** — 30+ typed accessor functions that read from the manifest with env var fallback
 - **`agent/server.py`** — Modified to load model ID, temperature, max tokens, and system prompt from the manifest
 - **`agent/webapp.py`** — Modified to load default repo, Slack config, and allowed orgs from the manifest
 
@@ -58,7 +58,7 @@ This is what GitHub Actions calls.
 
 ### Step 4: Create GitHub Actions Workflow
 
-`.github/workflows/agent.yml` defines 8 trigger types — 5 for the base swe-coder agent
+`.github/workflows/agent.yml` defines 8 trigger types — 6 for the base swe-coder agent
 and 3 for dynamic skills (code-review, security-scan, doc-gen, test-gen, project-docs).
 
 ### Step 5: Add Dynamic Skills

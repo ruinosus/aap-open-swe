@@ -14,7 +14,7 @@ Um **coding agent autonomo** que:
 5. Abre um **Pull Request** automaticamente
 6. Comenta na issue/thread com o resumo
 
-Alem disso, possui **5 skills dinamicas** que ativam automaticamente:
+Alem disso, possui **6 skills dinamicas** que ativam automaticamente:
 - **Code Review** — revisa PRs com inline comments automaticos
 - **Security Scan** — detecta vulnerabilidades (OWASP Top 10, secrets, injection)
 - **Doc Generator** — gera docstrings e documentacao de codigo
@@ -92,7 +92,7 @@ GOOGLE_API_KEY=...
 
 ## AAP SDK Integration
 
-The `agent/aap_config.py` module provides 25+ typed accessor functions:
+The `agent/aap_config.py` module provides 30+ typed accessor functions:
 
 ```python
 from agent.aap_config import (
