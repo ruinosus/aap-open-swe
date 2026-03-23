@@ -563,6 +563,19 @@ jobs:
           script: |
             const body = context.payload.comment.body;
             const task = body.replace(/@aap-open-swe/gi, '').trim();
+
+            // Detect skill commands
+            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs)\b/i);
+            const skillMap = {
+              'review': 'code-review',
+              'security': 'security-scan',
+              'docs': 'project-docs',
+              'tests': 'test-generator',
+              'project-docs': 'project-docs',
+            };
+            const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
+            core.setOutput('skill_id', skillId);
+
             const issue = context.payload.issue;
             const fullTask = `PR #${issue.number}: ${issue.title}\n\n${issue.body || ''}\n\nReview comment: ${task}`;
             core.setOutput('task', fullTask);
@@ -572,10 +585,12 @@ jobs:
         id: agent
         env:
           TASK: ${{ steps.extract.outputs.task }}
+          SKILL_ID: ${{ steps.extract.outputs.skill_id }}
           REPO_DIR: ${{ github.workspace }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
