@@ -90,6 +90,14 @@ OPEN_SWE_MODEL=google_genai:gemini-2.5-pro
 GOOGLE_API_KEY=...
 ```
 
+## Guardrail Middleware
+
+This project includes three new guardrail middleware components:
+
+1. **skill_file_scope** — Ensures review skills do not write files.
+2. **secret_filter** — Redacts hardcoded `ghp_` tokens from output.
+3. **output_validator** — Validates JSON structure to ensure compliance.
+
 ## AAP SDK Integration
 
 The `agent/aap_config.py` module provides 25+ typed accessor functions:

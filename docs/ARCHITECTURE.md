@@ -83,6 +83,14 @@ We added a manifest-driven skill system where adding a new behavior requires zer
 | `test-generator` | Label `needs-tests` | `@aap-open-swe tests` | Draft PR with tests |
 | `project-docs` | PR merged to main | `@aap-open-swe docs` | Draft PR with .md updates |
 
+### Guardrail Middleware Integration
+
+The architecture includes three guardrail middleware components:
+
+- **skill_file_scope**: Ensures that review skills do not write files, maintaining the integrity of the codebase.
+- **secret_filter**: Automatically redacts any hardcoded `ghp_` tokens from outputs to prevent accidental leaks.
+- **output_validator**: Validates JSON structures to ensure they meet the required specifications.
+
 ### How Skills Work
 
 ```
