@@ -33,8 +33,10 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         logger.error("GITHUB_TOKEN not set")
         sys.exit(1)
 
-    # Create local sandbox pointing at the cloned repo
-    sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True)
+    # Create local sandbox pointing at the cloned repo.
+    # virtual_mode=True restricts file operations to root_dir, preventing
+    # the agent from scanning system directories like /proc.
+    sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True, virtual_mode=True)
 
     # Configure git identity
     sandbox.execute("git config user.name 'aap-open-swe[bot]'")
