@@ -27,3 +27,4 @@ def fetch_data(url):
     # Command injection risk
     result = subprocess.run(f"curl {url}", shell=True, capture_output=True)
     return result.stdout
+# Guardrails E2E test
