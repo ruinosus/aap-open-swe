@@ -127,7 +127,28 @@ Use the execute tool for all git operations.
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    logger.info("Creating agent with model=%s", model_id)
+    # Build middleware stack based on skill type
+    middleware = []
+    if skill_id and skill_id not in ("swe-coder", ""):
+        from agent.middleware.output_validator import create_output_validator
+        from agent.middleware.secret_filter import secret_filter
+        from agent.middleware.skill_file_scope import create_skill_file_scope_middleware
+
+        # 1. File scope enforcement (before_model)
+        file_scope_mw = create_skill_file_scope_middleware(skill_id)
+        if file_scope_mw:
+            middleware.append(file_scope_mw)
+            logger.info("Added file scope guardrail for skill %s", skill_id)
+
+        # 2. Secret redaction (after_agent) — always active for skills
+        middleware.append(secret_filter)
+
+        # 3. Output validation (after_agent)
+        output_mw = create_output_validator(skill_id)
+        if output_mw:
+            middleware.append(output_mw)
+
+    logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
 
     agent = create_deep_agent(
         model=model,
@@ -135,6 +156,7 @@ Use the execute tool for all git operations.
         tools=[],
         backend=sandbox,
         response_format=response_format,
+        middleware=middleware if middleware else None,
     )
 
     logger.info("Sending task to agent: %s", task[:200])
