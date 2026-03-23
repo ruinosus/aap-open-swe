@@ -5,10 +5,22 @@ valid JSON output from any LLM that supports structured outputs
 (OpenAI GPT-4o, Claude, etc.).
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class ReviewComment(BaseModel):
+class _StrictSchema(BaseModel):
+    """Base class that sets additionalProperties=false for OpenAI compatibility.
+
+    OpenAI's structured outputs API requires all object schemas to have
+    additionalProperties set to false. Pydantic v2 ConfigDict handles this.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={"additionalProperties": False},
+    )
+
+
+class ReviewComment(_StrictSchema):
     """A single review finding on a specific file and line."""
 
     file: str = Field(description="File path relative to repository root")
@@ -17,7 +29,7 @@ class ReviewComment(BaseModel):
     severity: str = Field(description="One of: critical, high, medium, low")
 
 
-class ReviewOutput(BaseModel):
+class ReviewOutput(_StrictSchema):
     """Structured output for code-review and security-scan skills."""
 
     skill_output_type: str = Field(
@@ -32,7 +44,7 @@ class ReviewOutput(BaseModel):
     )
 
 
-class PROutput(BaseModel):
+class PROutput(_StrictSchema):
     """Structured output for doc-generator and test-generator skills."""
 
     skill_output_type: str = Field(
