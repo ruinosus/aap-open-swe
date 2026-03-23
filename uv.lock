@@ -456,16 +456,16 @@ wheels = [
 
 [[package]]
 name = "cockpit-aap-sdk"
-version = "0.4.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pyyaml" },
     { name = "simpleeval" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d3/8d/a1456019a09f7b6df14700745dbbd116e8e03e7bec0901305e69ce484390/cockpit_aap_sdk-0.4.0.tar.gz", hash = "sha256:b8d422bab4c834b8e669d850623c9ded39da816e455af9f20c3f10764284af40", size = 516533, upload-time = "2026-03-21T11:41:45.984Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/15/69f26ba9d458d6cc8a36736aa276b0a945fe3748db9428e40dc9a1cd26e9/cockpit_aap_sdk-0.5.0.tar.gz", hash = "sha256:60118ddf7608cbdaa37e95ba2af98fde03b1159d2e099173d08a7481d1648786", size = 582103, upload-time = "2026-03-23T15:52:35.54Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/ca/d2b84c651e62507d37499a2da083caf04140797771e27931a5f4c418a263/cockpit_aap_sdk-0.4.0-py3-none-any.whl", hash = "sha256:b291b8e3cb63b0b723e82f315f5c8eb531cf0c58c677a7b25298dedd045bb921", size = 321752, upload-time = "2026-03-21T11:41:44.395Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/dc/574cc97333800d3f63be34de729e202ad79c56d87c6b6ddd2158b5a44415/cockpit_aap_sdk-0.5.0-py3-none-any.whl", hash = "sha256:1a9da5acdd6cf852d63c7e7b32061ab489fda0ee32f58e74ce479c9df1f86a7d", size = 347127, upload-time = "2026-03-23T15:52:34.114Z" },
 ]
 
 [[package]]

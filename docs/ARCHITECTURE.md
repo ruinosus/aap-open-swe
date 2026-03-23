@@ -9,7 +9,7 @@ external server, ngrok tunnel, or cloud sandbox.
 
 ### Architecture Diagram
 
-![Architecture](https://excalidraw.com/#json=bb11HgJqtDIdsWVM_xpPa,pugcj1HrLMXxVcCF3REa2w)
+![Architecture](trigger-flow.drawio.png)
 
 ```
 GitHub Event (issue/comment/label/assign)
