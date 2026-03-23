@@ -49,7 +49,9 @@ Assign each finding one of the following severities:
 
 ### Step 4: Produce Output
 
-Return your findings as a single JSON object. Do NOT wrap it in markdown code fences. The JSON must conform exactly to this schema:
+**CRITICAL: Your final response MUST be ONLY a valid JSON object — no prose, no explanation, no markdown code fences before or after it.** The model runtime enforces a JSON schema, so output the JSON directly.
+
+The JSON must conform exactly to this schema:
 
 ```json
 {

@@ -14,36 +14,78 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+def _try_parse_json(text: str) -> dict | None:
+    """Attempt to parse text as JSON, returning dict or None."""
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
+    except (json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return None
+
+
+def _is_review(data: dict) -> bool:
+    """Check if parsed dict looks like a review output."""
+    return data.get("skill_output_type") == "review" or ("comments" in data and "summary" in data)
+
+
 def parse_review_output(agent_response: str) -> dict | None:
     """Extract structured review JSON from agent response.
 
-    Looks for a JSON block with skill_output_type == "review".
+    Uses multiple strategies to find valid review JSON:
+    1. Direct JSON parse (whole response is JSON)
+    2. Markdown code blocks (```json ... ``` or ``` ... ```)
+    3. Brace-matching extraction (find outermost { ... })
+    4. Lenient fallback (look for summary + comments fields)
+
     Returns the parsed dict or None if not found/invalid.
     """
-    # Try to find JSON in the response (may be wrapped in markdown code blocks)
-    json_patterns = [
+    if not agent_response or not agent_response.strip():
+        return None
+
+    text = agent_response.strip()
+
+    # Strategy 1: Direct parse — whole response is valid JSON
+    data = _try_parse_json(text)
+    if data and _is_review(data):
+        return data
+
+    # Strategy 2: Markdown code blocks
+    code_block_patterns = [
         r"```json\s*(.*?)\s*```",
-        r"```\s*(.*?)\s*```",
-        r"(\{[^{}]*\"skill_output_type\"[^{}]*\})",
+        r"```\s*(\{.*?\})\s*```",
     ]
-
-    for pattern in json_patterns:
-        matches = re.findall(pattern, agent_response, re.DOTALL)
+    for pattern in code_block_patterns:
+        matches = re.findall(pattern, text, re.DOTALL)
         for match in matches:
-            try:
-                data = json.loads(match)
-                if isinstance(data, dict) and data.get("skill_output_type") == "review":
-                    return data
-            except (json.JSONDecodeError, TypeError):
-                continue
+            data = _try_parse_json(match.strip())
+            if data and _is_review(data):
+                return data
 
-    # Try parsing the whole string as JSON
-    try:
-        data = json.loads(agent_response)
-        if isinstance(data, dict) and data.get("skill_output_type") == "review":
+    # Strategy 3: Find the outermost JSON object using brace matching
+    start = text.find("{")
+    if start != -1:
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start : i + 1]
+                    data = _try_parse_json(candidate)
+                    if data and _is_review(data):
+                        return data
+                    break
+
+    # Strategy 4: Find ANY JSON object containing skill_output_type
+    # Handles cases where the model outputs prose + JSON
+    json_obj_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
+    for match in re.finditer(json_obj_pattern, text, re.DOTALL):
+        data = _try_parse_json(match.group())
+        if data and _is_review(data):
             return data
-    except (json.JSONDecodeError, TypeError):
-        pass
 
     return None
 

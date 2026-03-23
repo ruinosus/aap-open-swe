@@ -66,7 +66,7 @@ git push origin aap-open-swe/docs-update-{issue_number}
 
 ### Step 5: Produce Output
 
-Return a JSON object describing what was done. Do NOT wrap it in markdown code fences:
+**CRITICAL: Your final response MUST be ONLY a valid JSON object — no prose, no explanation, no markdown code fences before or after it.** The model runtime enforces a JSON schema, so output the JSON directly.
 
 ```json
 {

@@ -37,6 +37,56 @@ def test_parse_review_output_wrong_type():
     assert result is None
 
 
+def test_parse_review_output_markdown_code_block():
+    from agent.review_poster import parse_review_output
+
+    raw = """Here is my analysis of the code:
+
+```json
+{"skill_output_type": "review", "summary": "Found issues", "score": "6/10", "comments": [{"file": "a.py", "line": 1, "message": "Bug", "severity": "high"}]}
+```
+
+That's my review."""
+    result = parse_review_output(raw)
+    assert result is not None
+    assert result["summary"] == "Found issues"
+    assert len(result["comments"]) == 1
+
+
+def test_parse_review_output_prose_before_json():
+    from agent.review_poster import parse_review_output
+
+    raw = """I've analyzed the code and found several issues.
+
+{"skill_output_type": "review", "summary": "3 issues found", "score": "5/10", "comments": [{"file": "b.py", "line": 10, "message": "SQL injection", "severity": "critical"}]}"""
+    result = parse_review_output(raw)
+    assert result is not None
+    assert result["score"] == "5/10"
+
+
+def test_parse_review_output_lenient_no_skill_output_type():
+    from agent.review_poster import parse_review_output
+
+    # Some models may omit skill_output_type but still have the right structure
+    raw = json.dumps(
+        {
+            "summary": "All good",
+            "score": "9/10",
+            "comments": [],
+        }
+    )
+    result = parse_review_output(raw)
+    assert result is not None
+    assert result["summary"] == "All good"
+
+
+def test_parse_review_output_empty_string():
+    from agent.review_poster import parse_review_output
+
+    assert parse_review_output("") is None
+    assert parse_review_output("   ") is None
+
+
 def test_format_review_summary():
     from agent.review_poster import format_review_summary
 

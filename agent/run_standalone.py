@@ -106,6 +106,23 @@ Do NOT call commit_and_open_pr or github_comment tools — they are not availabl
 Use the execute tool for all git operations.
 """
 
+    # Build response_format for skill-based executions (structured output)
+    response_format = None
+    if skill_id and skill_id not in ("swe-coder", ""):
+        try:
+            from langchain.agents.structured_output import ProviderStrategy
+
+            from agent.schemas import SKILL_SCHEMAS
+
+            schema = SKILL_SCHEMAS.get(skill_id)
+            if schema:
+                response_format = ProviderStrategy(schema=schema, strict=True)
+                logger.info("Using structured output schema: %s", schema.__name__)
+        except Exception:
+            logger.warning(
+                "Could not set up structured output, falling back to free-form", exc_info=True
+            )
+
     logger.info("Creating agent with model=%s", model_id)
 
     agent = create_deep_agent(
@@ -113,6 +130,7 @@ Use the execute tool for all git operations.
         system_prompt=system_prompt,
         tools=[],
         backend=sandbox,
+        response_format=response_format,
     )
 
     logger.info("Sending task to agent: %s", task[:200])
@@ -134,13 +152,36 @@ Use the execute tool for all git operations.
         last = ai_messages[-1].content
         agent_response = last if isinstance(last, str) else json.dumps(last, indent=2)
 
+    # Check for structured_response (from response_format / ProviderStrategy)
+    structured_response = result.get("structured_response")
+    if structured_response:
+        logger.info("Got structured_response from agent")
+        if hasattr(structured_response, "model_dump"):
+            # Pydantic model — convert to dict/JSON
+            structured_data = structured_response.model_dump()
+            agent_response = json.dumps(structured_data, indent=2)
+        elif isinstance(structured_response, dict):
+            structured_data = structured_response
+            agent_response = json.dumps(structured_data, indent=2)
+        else:
+            structured_data = None
+    else:
+        structured_data = None
+
     logger.info("Agent finished with %d messages", len(messages))
 
     # Post review if skill is review-type
     if skill_id in ("code-review", "security-scan") and pr_number:
         from agent.review_poster import parse_review_output, post_pr_review
 
-        review = parse_review_output(agent_response)
+        # Prefer structured_data if available, else parse from free-form text
+        review = None
+        if structured_data and structured_data.get("skill_output_type") == "review":
+            review = structured_data
+            logger.info("Using structured_response for review posting")
+        else:
+            review = parse_review_output(agent_response)
+
         if review:
             post_pr_review(repo_owner, repo_name, pr_number, review, skill_id)
         else:
