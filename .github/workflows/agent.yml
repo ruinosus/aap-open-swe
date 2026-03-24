@@ -151,6 +151,7 @@ jobs:
         if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
+          SKILL_ID: ${{ steps.extract.outputs.skill_id }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -158,9 +159,89 @@ jobs:
             const hasChanges = '${{ steps.agent.outputs.has_changes }}' === 'true';
             const prUrl = '${{ steps.create-pr.outputs.pr_url }}' || '';
             const agentResponse = (process.env.AGENT_RESPONSE || '').slice(0, 5000);
+            const skillId = process.env.SKILL_ID || '';
 
             let comment;
-            if (hasChanges && prUrl) {
+
+            // Format sizing reports with rich markdown
+            if (skillId === 'aap-sizing') {
+              let sizingData = null;
+              try {
+                // Parse JSON from agent response (may be nested in text field)
+                const jsonMatch = agentResponse.match(/\{[\s\S]*"skill_output_type"[\s\S]*\}/);
+                if (jsonMatch) sizingData = JSON.parse(jsonMatch[0]);
+              } catch (e) {
+                try {
+                  const textMatch = agentResponse.match(/"text":\s*"(\{.*?\})"/s);
+                  if (textMatch) sizingData = JSON.parse(textMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+                } catch {}
+              }
+
+              if (sizingData) {
+                const layerEmoji = { 1: '🧱', 2: '🔧', 3: '🎨', 4: '🛡️', 5: '✨' };
+                const impactEmoji = { high: '🔴', medium: '🟡', low: '🟢' };
+                const lines = [];
+
+                lines.push('## 📊 AAP SDK Migration — Sizing Report');
+                lines.push('');
+                lines.push(`| Metric | Value |`);
+                lines.push(`|--------|-------|`);
+                lines.push(`| **Repository** | ${sizingData.repo_url} |`);
+                lines.push(`| **Type** | ${sizingData.repo_type === 'external' ? '🔀 External (fork required)' : '🏠 Internal'} |`);
+                lines.push(`| **Languages** | ${(sizingData.languages || []).join(', ')} |`);
+                lines.push(`| **Total Findings** | **${sizingData.total_findings}** |`);
+                lines.push('');
+
+                // Layer summary
+                const layers = sizingData.layers || [];
+                if (layers.length > 0) {
+                  lines.push('### Layers');
+                  lines.push('');
+                  lines.push('| Layer | Name | Findings | Breaking? |');
+                  lines.push('|-------|------|----------|-----------|');
+                  for (const l of layers) {
+                    const emoji = layerEmoji[l.layer] || '📦';
+                    const breaking = l.is_breaking ? '⚠️ Yes' : '✅ No';
+                    lines.push(`| ${emoji} ${l.layer} | **${l.name}** | ${l.count || l.findings_count || 0} | ${breaking} |`);
+                  }
+                  lines.push('');
+                }
+
+                // Findings detail
+                const findings = sizingData.findings || [];
+                if (findings.length > 0) {
+                  lines.push('<details>');
+                  lines.push(`<summary>📋 Detailed Findings (${findings.length})</summary>`);
+                  lines.push('');
+                  lines.push('| # | Layer | Impact | File | Description |');
+                  lines.push('|---|-------|--------|------|-------------|');
+                  findings.forEach((f, i) => {
+                    const impact = impactEmoji[f.impact] || '⚪';
+                    const file = (f.file_path || f.file || '').replace('/tmp/aap-sizing-target/', '');
+                    const desc = (f.rationale || f.description || '').slice(0, 80);
+                    lines.push(`| ${i+1} | L${f.layer} | ${impact} ${f.impact} | \`${file}\` | ${desc} |`);
+                  });
+                  lines.push('');
+                  lines.push('</details>');
+                  lines.push('');
+                }
+
+                // Next steps
+                lines.push('### Next Steps');
+                lines.push('');
+                lines.push('```');
+                lines.push('@aap-open-swe migrate --layer=core        # 🧱 Safe, non-breaking');
+                lines.push('@aap-open-swe migrate --layer=tools       # 🔧 Safe, non-breaking');
+                lines.push('@aap-open-swe migrate --layer=frontend    # 🎨 ⚠️ BREAKING');
+                lines.push('@aap-open-swe migrate --layer=governance  # 🛡️ Safe, non-breaking');
+                lines.push('@aap-open-swe migrate --layer=polish      # ✨ Safe, non-breaking');
+                lines.push('```');
+
+                comment = lines.join('\n');
+              } else {
+                comment = `### AAP Open SWE Agent — Sizing\n\n${agentResponse}`;
+              }
+            } else if (hasChanges && prUrl) {
               comment = `### AAP Open SWE Agent\n\nI've analyzed the issue and opened a draft PR with the fix:\n${prUrl}\n\n<details>\n<summary>Agent output</summary>\n\n${agentResponse}\n\n</details>`;
             } else {
               comment = `### AAP Open SWE Agent\n\n${agentResponse || 'I analyzed the issue but no code changes were needed.'}`;
