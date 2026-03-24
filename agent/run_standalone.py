@@ -115,7 +115,9 @@ def _format_sizing_markdown(agent_response: str) -> str:
     lines.append("@aap-open-swe migrate --layer=frontend    # \U0001f3a8 \u26a0\ufe0f BREAKING")
     lines.append("@aap-open-swe migrate --layer=governance  # \U0001f6e1\ufe0f Safe, non-breaking")
     lines.append("@aap-open-swe migrate --layer=polish      # \u2728 Safe, non-breaking")
-    lines.append("@aap-open-swe migrate --layer=code        # \U0001f4bb \u26a0\ufe0f BREAKING (refactors source)")
+    lines.append(
+        "@aap-open-swe migrate --layer=code        # \U0001f4bb \u26a0\ufe0f BREAKING (refactors source)"
+    )
     lines.append("```")
 
     return "\n".join(lines)
@@ -388,7 +390,9 @@ Use the execute tool for all git operations.
         "aap-sizing": "aap-migration/sizing",
         "migrate-to-aap": "aap-migration/full",
     }
-    branch_name = skill_branch_names.get(skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}")
+    branch_name = skill_branch_names.get(
+        skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}"
+    )
 
     if has_changes:
         # Validate push target against org whitelist BEFORE pushing
