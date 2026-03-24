@@ -85,13 +85,20 @@ async def test_review_skill_with_sdk_guardrails():
     )
 
     result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": """Review this code:
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": """Review this code:
 ```python
 # file: example.py
 def get_user(user_id):
     query = "SELECT * FROM users WHERE id = " + user_id  # line 3
     return query
-```"""}]},
+```""",
+                }
+            ]
+        },
     )
 
     # Extract response

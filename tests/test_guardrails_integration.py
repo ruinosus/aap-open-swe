@@ -107,12 +107,14 @@ class TestOutputValidatorIntegration:
         mw = create_output_validator("code-review")
         assert mw is not None
 
-        valid_json = json.dumps({
-            "skill_output_type": "review",
-            "summary": "All good",
-            "score": "9/10",
-            "comments": [],
-        })
+        valid_json = json.dumps(
+            {
+                "skill_output_type": "review",
+                "summary": "All good",
+                "score": "9/10",
+                "comments": [],
+            }
+        )
         state = {"messages": [AIMessage(content=valid_json)]}
         result = mw.after_agent(state, RUNTIME)
         assert result is None
