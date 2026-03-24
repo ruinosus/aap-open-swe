@@ -370,7 +370,7 @@ Use the execute tool for all git operations.
     # Use skill-specific branch names
     skill_branch_names = {
         "aap-sizing": "aap-migration/sizing",
-        "migrate-to-aap": f"aap-migration/layer-{issue_number}",
+        "migrate-to-aap": "aap-migration/full",
     }
     branch_name = skill_branch_names.get(skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}")
 
