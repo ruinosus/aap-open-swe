@@ -96,6 +96,7 @@ jobs:
 
             core.setOutput('task', fullTask);
             core.setOutput('issue_number', issue.number);
+            core.setOutput('comment_id', context.payload.comment ? String(context.payload.comment.id) : '');
 
       - name: Fork and clone target repo
         id: target
@@ -195,6 +196,7 @@ jobs:
           SANDBOX_TYPE: local
           SOURCE_ISSUE_REPO: ${{ github.repository }}
           SOURCE_ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          PROGRESS_COMMENT_ID: ${{ steps.extract.outputs.comment_id }}
         run: |
           source .venv/bin/activate
           PYTHONPATH=${{ github.workspace }} python agent/run_standalone.py

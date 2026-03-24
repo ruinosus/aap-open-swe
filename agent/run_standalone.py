@@ -136,6 +136,13 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_model_temperature,
         get_skill_instruction,
     )
+    from agent.observability import (
+        AgentStreamingCallback,
+        ProgressReporter,
+        gh_group,
+        gh_notice,
+        write_step_summary,
+    )
     from agent.utils.model import make_model
 
     github_token = os.environ.get("GITHUB_TOKEN", "")
@@ -143,63 +150,77 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         logger.error("GITHUB_TOKEN not set")
         sys.exit(1)
 
-    # Create local sandbox pointing at the cloned repo.
-    # virtual_mode=True restricts file operations to root_dir, preventing
-    # the agent from scanning system directories like /proc.
-    sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True, virtual_mode=True)
-
-    # Configure git identity
-    sandbox.execute("git config user.name 'aap-open-swe[bot]'")
-    sandbox.execute("git config user.email 'aap-open-swe@users.noreply.github.com'")
-
-    # Load model from manifest
-    model_id = get_model_id()
-    model = make_model(
-        model_id,
-        temperature=get_model_temperature(),
-        max_tokens=get_model_max_tokens(),
+    # Initialize progress reporter for live issue comment updates
+    progress = ProgressReporter(
+        github_token=github_token,
+        repo_owner=repo_owner,
+        repo_name=repo_name,
+        issue_number=issue_number,
+        comment_id=int(os.environ.get("PROGRESS_COMMENT_ID", "0")) or None,
+        source_repo=os.environ.get("SOURCE_ISSUE_REPO", f"{repo_owner}/{repo_name}"),
     )
+
+    with gh_group("Sandbox setup"):
+        # Create local sandbox pointing at the cloned repo.
+        # virtual_mode=True restricts file operations to root_dir, preventing
+        # the agent from scanning system directories like /proc.
+        sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True, virtual_mode=True)
+
+        # Configure git identity
+        sandbox.execute("git config user.name 'aap-open-swe[bot]'")
+        sandbox.execute("git config user.email 'aap-open-swe@users.noreply.github.com'")
+
+    with gh_group("Model loading"):
+        # Load model from manifest
+        model_id = get_model_id()
+        model = make_model(
+            model_id,
+            temperature=get_model_temperature(),
+            max_tokens=get_model_max_tokens(),
+        )
+        gh_notice(f"Model: {model_id}")
 
     # Check for skill-specific execution
     skill_id = os.environ.get("SKILL_ID", "")
     pr_number = int(os.environ.get("PR_NUMBER", "0"))
 
-    # Build system prompt — skill overrides base if specified
-    if skill_id and skill_id not in ("swe-coder", ""):
-        skill_instruction = get_skill_instruction(skill_id)
-        if skill_instruction:
-            # Use simple string replace instead of .format() to avoid
-            # conflicts with JSON curly braces in skill instructions
-            system_prompt = (
-                skill_instruction.replace("{working_dir}", repo_dir)
-                .replace("{repo_owner}", repo_owner)
-                .replace("{repo_name}", repo_name)
-                .replace("{pr_number}", str(pr_number))
-                .replace("{issue_number}", str(issue_number))
-            )
-        else:
-            logger.warning("Skill %s not found, falling back to swe-coder", skill_id)
-            skill_id = ""  # fall through to default
-            system_prompt = ""
+    with gh_group(f"System prompt — {skill_id or 'swe-coder'}"):
+        # Build system prompt — skill overrides base if specified
+        if skill_id and skill_id not in ("swe-coder", ""):
+            skill_instruction = get_skill_instruction(skill_id)
+            if skill_instruction:
+                # Use simple string replace instead of .format() to avoid
+                # conflicts with JSON curly braces in skill instructions
+                system_prompt = (
+                    skill_instruction.replace("{working_dir}", repo_dir)
+                    .replace("{repo_owner}", repo_owner)
+                    .replace("{repo_name}", repo_name)
+                    .replace("{pr_number}", str(pr_number))
+                    .replace("{issue_number}", str(issue_number))
+                )
+            else:
+                logger.warning("Skill %s not found, falling back to swe-coder", skill_id)
+                skill_id = ""  # fall through to default
+                system_prompt = ""
 
-    if not skill_id or skill_id == "swe-coder":
-        # Default swe-coder behavior
-        manifest_instruction = get_agent_instruction()
-        if manifest_instruction:
-            system_prompt = manifest_instruction.format(
-                working_dir=repo_dir,
-                linear_project_id="",
-                linear_issue_number="",
-                agents_md_section="",
-            )
-        else:
-            system_prompt = (
-                f"You are a coding assistant. Your working directory is {repo_dir}. "
-                "Use the execute tool to run commands. Be concise and focused."
-            )
+        if not skill_id or skill_id == "swe-coder":
+            # Default swe-coder behavior
+            manifest_instruction = get_agent_instruction()
+            if manifest_instruction:
+                system_prompt = manifest_instruction.format(
+                    working_dir=repo_dir,
+                    linear_project_id="",
+                    linear_issue_number="",
+                    agents_md_section="",
+                )
+            else:
+                system_prompt = (
+                    f"You are a coding assistant. Your working directory is {repo_dir}. "
+                    "Use the execute tool to run commands. Be concise and focused."
+                )
 
-    # Add GitHub Actions context to the prompt
-    system_prompt += f"""
+        # Add GitHub Actions context to the prompt
+        system_prompt += f"""
 
 ---
 
@@ -217,6 +238,7 @@ When you are done with your changes:
 Do NOT call commit_and_open_pr or github_comment tools — they are not available here.
 Use the execute tool for all git operations.
 """
+        gh_notice(f"Skill: {skill_id or 'swe-coder'}, prompt: {len(system_prompt)} chars")
 
     # Build response_format for review-type skills (structured output).
     # PR-type skills (doc-generator, test-generator, project-docs) need tool
@@ -239,10 +261,7 @@ Use the execute tool for all git operations.
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    # Build guardrail middleware from AAP SDK v0.6.0.
-    # Automatically resolves kind: Guardrail manifests from .aap/ and applies
-    # PII detection, secret redaction, destructive command blocking, and
-    # per-skill file scope enforcement — all from YAML, no custom Python.
+    # Build middleware stack
     middleware = []
     try:
         from cockpit_aap import create_guardrail_middleware
@@ -292,16 +311,17 @@ Use the execute tool for all git operations.
         middleware.append(ensure_no_empty_msg)
         logger.info("Added ensure_no_empty_msg middleware (forces tool usage)")
 
-    logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
+    with gh_group(f"Middleware stack ({len(middleware)} layers)"):
+        logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
 
-    agent = create_deep_agent(
-        model=model,
-        system_prompt=system_prompt,
-        **({} if use_default_tools else {"tools": []}),
-        backend=sandbox,
-        response_format=response_format,
-        middleware=middleware if middleware else None,
-    )
+        agent = create_deep_agent(
+            model=model,
+            system_prompt=system_prompt,
+            **({} if use_default_tools else {"tools": []}),
+            backend=sandbox,
+            response_format=response_format,
+            middleware=middleware if middleware else None,
+        )
 
     logger.info("Sending task to agent: %s", task[:200])
 
@@ -312,10 +332,18 @@ Use the execute tool for all git operations.
     invoke_config = {"recursion_limit": get_recursion_limit()}
     logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
 
+    # Create streaming callback for tool-level observability
+    streaming_cb = AgentStreamingCallback(progress_reporter=progress)
+    invoke_config["callbacks"] = [streaming_cb]
+
+    progress.start_phase(f"Agent ({skill_id or 'swe-coder'})")
+
     result = await agent.ainvoke(
         {"messages": [{"role": "user", "content": task}]},
         config=invoke_config,
     )
+
+    progress.complete_phase(f"Agent ({skill_id or 'swe-coder'})")
 
     messages = result.get("messages", [])
     ai_messages = [
@@ -394,6 +422,8 @@ Use the execute tool for all git operations.
         skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}"
     )
 
+    progress.start_phase("Push & PR")
+
     if has_changes:
         # Validate push target against org whitelist BEFORE pushing
         allowed_orgs = get_allowed_github_orgs()
@@ -425,9 +455,14 @@ Use the execute tool for all git operations.
                 logger.error("Push failed: %s", push_result.output)
                 has_changes = False
 
+    progress.complete_phase("Push & PR")
+
     # Format sizing reports as rich markdown before output
     if skill_id == "aap-sizing":
         agent_response = _format_sizing_markdown(agent_response)
+
+    # Finalize progress reporter
+    progress.finalize(success=has_changes or not use_default_tools, result=agent_response[:500])
 
     # Output results for the workflow
     outputs = {
@@ -445,6 +480,25 @@ Use the execute tool for all git operations.
             f.write(f"agent_response<<AGENT_EOF\n{agent_response[:60000]}\nAGENT_EOF\n")
     else:
         print(json.dumps(outputs, indent=2))
+
+    # Write GitHub Actions step summary
+    tool_call_count = sum(
+        len(getattr(m, "tool_calls", [])) for m in messages if hasattr(m, "tool_calls")
+    )
+    summary_lines = [
+        "## Agent Execution Summary",
+        "",
+        "| Key | Value |",
+        "|-----|-------|",
+        f"| **Skill** | `{skill_id or 'swe-coder'}` |",
+        f"| **Model** | `{model_id}` |",
+        f"| **Repo** | `{repo_owner}/{repo_name}` |",
+        f"| **Messages** | {len(messages)} |",
+        f"| **Tool calls** | {tool_call_count} |",
+        f"| **Has changes** | {'Yes' if has_changes else 'No'} |",
+        f"| **Branch** | `{branch_name}` |",
+    ]
+    write_step_summary("\n".join(summary_lines))
 
     return outputs
 
