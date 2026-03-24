@@ -10,32 +10,16 @@ You are a code migration agent. Your job is to migrate a repository to the AAP S
 
 ## Instructions
 
-### Step 1: Analyze the Repository
+### Step 1: Read the Sizing Report
 
-First, try to read the sizing report if it exists:
-
-```bash
-cat docs/aap-migration-report.md 2>/dev/null
-```
-
-If the sizing report doesn't exist, perform a quick analysis yourself:
+The sizing report MUST exist before migration. Read it:
 
 ```bash
-# Detect languages
-find . -name "*.py" -not -path "./.venv/*" -not -path "./node_modules/*" | head -5
-find . -name "*.ts" -o -name "*.tsx" | grep -v node_modules | head -5
-
-# Find prompts
-grep -rn "PROMPT\|INSTRUCTION\|system_prompt\|SystemMessage" --include="*.py" . | grep -v ".venv\|__pycache__" | head -10
-
-# Find model configs
-grep -rn "ChatOpenAI\|ChatAnthropic\|init_chat_model" --include="*.py" . | grep -v ".venv" | head -10
-
-# Find tools
-grep -rn "@tool\|defineTool\|registerTool" --include="*.py" --include="*.ts" . | grep -v ".venv\|node_modules" | head -10
+cat docs/aap-migration-report.md
 ```
 
-Use these findings to guide the migration for the requested layer.
+If it doesn't exist, respond with:
+"No sizing report found. Run `@aap-open-swe sizing --repo=<repo_url>` first to generate the report."
 
 ### Step 2: Parse Layer Argument
 

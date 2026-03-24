@@ -1,17 +1,30 @@
 apiVersion: governance.cockpit.io/v1
 kind: Guardrail
 metadata:
-  name: sizing-read-only
-  description: Ensures aap-sizing skill cannot modify any files (analysis only)
+  name: sizing-scope
+  description: Sizing skill can only write the migration report file
 spec:
   appliesTo:
     kind: Skill
     when: "id == 'aap-sizing'"
   phase: input
   rules:
-    - id: read-only
+    - id: sizing-scope
       category: scope
       onFail: block
-      message: 'Sizing skill is read-only and cannot modify files'
+      message: 'Sizing skill can only write docs/aap-migration-report.md'
   scope:
-    allow_writes: false
+    allow_writes: true
+    allowed_patterns:
+      - 'docs/aap-migration-report.md'
+    blocked_patterns:
+      - '*.py'
+      - '*.ts'
+      - '*.tsx'
+      - '*.yaml'
+      - '*.yml'
+      - '*.json'
+      - '.github/*'
+      - '.aap/*'
+      - 'agent/*'
+      - 'tests/*'
