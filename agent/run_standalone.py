@@ -41,6 +41,7 @@ def _format_sizing_markdown(agent_response: str) -> str:
         3: "\U0001f3a8",
         4: "\U0001f6e1\ufe0f",
         5: "\u2728",
+        6: "\U0001f4bb",
     }
     impact_emoji = {"high": "\U0001f534", "medium": "\U0001f7e1", "low": "\U0001f7e2"}
     lines = []
@@ -114,6 +115,7 @@ def _format_sizing_markdown(agent_response: str) -> str:
     lines.append("@aap-open-swe migrate --layer=frontend    # \U0001f3a8 \u26a0\ufe0f BREAKING")
     lines.append("@aap-open-swe migrate --layer=governance  # \U0001f6e1\ufe0f Safe, non-breaking")
     lines.append("@aap-open-swe migrate --layer=polish      # \u2728 Safe, non-breaking")
+    lines.append("@aap-open-swe migrate --layer=code        # \U0001f4bb \u26a0\ufe0f BREAKING (refactors source)")
     lines.append("```")
 
     return "\n".join(lines)

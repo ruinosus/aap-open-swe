@@ -35,25 +35,24 @@
 | Code review | Open PR → automatic inline comments | Working |
 | Security scan | Open PR → automatic inline comments | Working |
 | Sizing cross-repo | `@aap-open-swe sizing https://github.com/CopilotKit/OpenGenerativeUI` | Working |
-| Migration all layers | `@aap-open-swe migrate --repo=CopilotKit/OpenGenerativeUI` | Working (5 layers, 5 commits) |
+| Migration all layers | `@aap-open-swe migrate --repo=CopilotKit/OpenGenerativeUI` | Working (6 layers, 11 commits) |
 | Guardrails | Automatic on all skills | Working |
 | Repo protection | Push to unauthorized org → blocked | Working |
 
 ---
 
-## What's NOT Done Yet
+## Layer 6: Code Integration (IMPLEMENTED)
 
-### Layer 6: Code Integration (designed, not implemented)
+The `migrate-to-aap` skill now includes Layer 6, which refactors source code to
+consume the `.aap/` manifest created in Layers 1-5. Layer 6 covers 6 patterns,
+each as a separate commit:
 
-The migration currently creates `.aap/` files but does NOT refactor the source code
-to USE those files. Layer 6 covers 6 patterns:
-
-1. ManifestInstance initialization in entry points
-2. Agent instruction from manifest (replace hardcoded prompts)
-3. Model config from artifacts (replace hardcoded model IDs)
-4. Middleware stack assembly (guardrail → rules → persona → skills → HITL)
-5. HITL tool registration (Zod schemas from manifest, useHumanInTheLoop)
-6. Frontend context providers (ManifestProvider, PersonaProvider)
+1. ManifestInstance initialization in entry points (Python + TypeScript)
+2. Agent instruction from manifest (replace hardcoded prompts with fallback)
+3. Model config from artifacts (replace hardcoded model IDs with fallback)
+4. Middleware stack assembly (guardrail + CopilotKit, extensible)
+5. HITL tool registration (StatefulCopilotKitMiddleware + Zod schemas + useHumanInTheLoop)
+6. Frontend context providers (ManifestProvider + useManifest hook + layout wiring)
 
 **Design spec:** `docs/superpowers/specs/2026-03-24-layer6-code-integration-design.md`
 **Reference files:** `docs/superpowers/specs/2026-03-24-launchpad-reference-files.md`
@@ -112,10 +111,8 @@ uv run ruff check . && uv run ruff format --check .
 
 ---
 
-## Next Session: Implementing Layer 6
+## Next Steps
 
-1. Read the 3 spec documents
-2. Update `migrate-to-aap.md` skill instruction to include Layer 6 patterns
-3. Test pattern by pattern on OpenGenerativeUI fork
-4. Each pattern = 1 commit on `aap-migration/full` branch
-5. After all 6 patterns: one PR with complete migration
+1. Test Layer 6 end-to-end on OpenGenerativeUI fork (`@aap-open-swe migrate --repo=CopilotKit/OpenGenerativeUI`)
+2. Verify each of the 6 pattern commits is correct
+3. Create PR with complete 6-layer migration

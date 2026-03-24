@@ -65,7 +65,7 @@ class PROutput(_StrictSchema):
 class SizingFinding(_StrictSchema):
     """A single finding from repository analysis."""
 
-    layer: int = Field(description="Migration layer (1-5)")
+    layer: int = Field(description="Migration layer (1-6)")
     category: str = Field(
         description="Finding category: prompt, model_config, tool, hitl, i18n, theme, connection, guardrail, form, persona"
     )
@@ -80,8 +80,8 @@ class SizingFinding(_StrictSchema):
 class SizingLayerSummary(_StrictSchema):
     """Summary for one migration layer."""
 
-    layer: int = Field(description="Layer number (1-5)")
-    name: str = Field(description="Layer name: core, tools, frontend, governance, polish")
+    layer: int = Field(description="Layer number (1-6)")
+    name: str = Field(description="Layer name: core, tools, frontend, governance, polish, code")
     findings_count: int = Field(description="Number of findings in this layer")
     estimated_effort: str = Field(description="Estimated effort (e.g., '2-3h')")
     is_breaking: bool = Field(description="Whether this layer modifies functional code")
@@ -109,7 +109,7 @@ class MigrationOutput(_StrictSchema):
     """Structured output for the migrate-to-aap skill."""
 
     skill_output_type: str = Field(default="migration", description="Always 'migration'")
-    layer: int = Field(description="Layer number executed (1-5)")
+    layer: int = Field(description="Layer number executed (1-6)")
     layer_name: str = Field(description="Layer name")
     summary: str = Field(description="Summary of changes made")
     files_created: list[str] = Field(default_factory=list, description="New files created")
