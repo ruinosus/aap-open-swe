@@ -102,6 +102,7 @@ jobs:
         if: steps.extract.outputs.target_repo != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROSS_REPO_PAT: ${{ secrets.CROSS_REPO_PAT }}
           TARGET_REPO: ${{ steps.extract.outputs.target_repo }}
         run: |
           TARGET_OWNER="${TARGET_REPO%%/*}"
@@ -116,25 +117,31 @@ jobs:
           # For migration, fork first then clone the fork.
           SKILL_ID="${{ steps.extract.outputs.skill_id }}"
 
+          # Determine the token to use for cross-repo access
+          # CROSS_REPO_PAT (fine-grained PAT) enables fork + push to other repos
+          # GITHUB_TOKEN only has access to the current repo
+          CROSS_TOKEN="${CROSS_REPO_PAT:-}"
+
           if [ "$TARGET_OWNER" != "$SELF_ORG" ]; then
-            if [ "$SKILL_ID" = "migrate-to-aap" ]; then
+            if [ "$SKILL_ID" = "migrate-to-aap" ] && [ -n "$CROSS_TOKEN" ]; then
               echo "Migration: forking $TARGET_OWNER/$TARGET_NAME to $SELF_ORG"
-              gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
+              GITHUB_TOKEN="$CROSS_TOKEN" gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
               sleep 10  # wait for fork to propagate
               CLONE_REPO="$SELF_ORG/$TARGET_NAME"
               echo "Cloning fork $CLONE_REPO"
-              gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
-                git clone "https://github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+              git clone "https://x-access-token:${CROSS_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+            elif [ "$SKILL_ID" = "migrate-to-aap" ] && [ -z "$CROSS_TOKEN" ]; then
+              echo "ERROR: Migration to external repos requires CROSS_REPO_PAT secret."
+              echo "Set up a fine-grained PAT at https://github.com/settings/tokens?type=beta"
+              echo "with Contents (read/write), Pull requests (read/write), Administration (read)."
+              exit 1
             else
-              echo "Sizing: cloning original $TARGET_OWNER/$TARGET_NAME (read-only)"
-              CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
-              gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
-                git clone "https://github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+              echo "Sizing: cloning $TARGET_OWNER/$TARGET_NAME (public, read-only)"
+              git clone "https://github.com/${TARGET_OWNER}/${TARGET_NAME}.git" "$TARGET_DIR"
             fi
           else
             CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
-            gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
-              git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+            git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
           fi
 
           # Output for next steps
