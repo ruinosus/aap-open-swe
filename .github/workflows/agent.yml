@@ -167,13 +167,22 @@ jobs:
             if (skillId === 'aap-sizing') {
               let sizingData = null;
               try {
-                // Parse JSON from agent response (may be nested in text field)
-                const jsonMatch = agentResponse.match(/\{[\s\S]*"skill_output_type"[\s\S]*\}/);
-                if (jsonMatch) sizingData = JSON.parse(jsonMatch[0]);
-              } catch (e) {
+                // Agent response may be: [{"type":"text","text":"{...}"}]
+                const parsed = JSON.parse(agentResponse);
+                if (Array.isArray(parsed)) {
+                  for (const block of parsed) {
+                    if (block.text) {
+                      try { sizingData = JSON.parse(block.text); break; } catch {}
+                    }
+                  }
+                } else if (parsed.skill_output_type) {
+                  sizingData = parsed;
+                }
+              } catch {
+                // Try regex extraction as fallback
                 try {
-                  const textMatch = agentResponse.match(/"text":\s*"(\{.*?\})"/s);
-                  if (textMatch) sizingData = JSON.parse(textMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+                  const m = agentResponse.match(/\{"skill_output_type"[^}]*"findings":\[[\s\S]*?\][\s\S]*?\}/);
+                  if (m) sizingData = JSON.parse(m[0]);
                 } catch {}
               }
 
