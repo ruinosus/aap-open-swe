@@ -275,14 +275,20 @@ Use the execute tool for all git operations.
         if output_mw:
             middleware.append(output_mw)
 
-    logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
-
-    # PR-type skills need tools (execute, read_file, write_file, etc.) to
-    # make changes, commit, and push. Review skills only need to analyze and
-    # return JSON, so tools=[] is fine (faster, no tool overhead).
+    # Add ensure_no_empty_msg middleware for skills that use tools.
+    # This is the key insight from the original Open SWE: it forces the agent
+    # to ALWAYS call a tool on every turn, preventing early JSON-only returns.
     pr_skills = ("doc-generator", "test-generator", "project-docs", "migrate-to-aap")
-    analysis_skills = ("aap-sizing",)  # read-only but needs execute for grep/find
+    analysis_skills = ("aap-sizing",)
     use_default_tools = skill_id in pr_skills or skill_id in analysis_skills
+
+    if use_default_tools:
+        from agent.middleware.ensure_no_empty_msg import ensure_no_empty_msg
+
+        middleware.append(ensure_no_empty_msg)
+        logger.info("Added ensure_no_empty_msg middleware (forces tool usage)")
+
+    logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
 
     agent = create_deep_agent(
         model=model,
@@ -295,8 +301,16 @@ Use the execute tool for all git operations.
 
     logger.info("Sending task to agent: %s", task[:200])
 
+    # Set recursion_limit high enough for multi-step tasks.
+    # Original Open SWE uses 1000. A 5-layer migration may need 50+ turns.
+    from agent.aap_config import get_recursion_limit
+
+    invoke_config = {"recursion_limit": get_recursion_limit()}
+    logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
+
     result = await agent.ainvoke(
         {"messages": [{"role": "user", "content": task}]},
+        config=invoke_config,
     )
 
     messages = result.get("messages", [])
