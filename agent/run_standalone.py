@@ -147,6 +147,20 @@ Use the execute tool for all git operations.
     except Exception:
         logger.warning("Could not create SDK guardrail middleware", exc_info=True)
 
+    # Repository protection — blocks pushes to repos outside ALLOWED_GITHUB_ORGS.
+    # External repos MUST be forked first. This is a critical safety guardrail.
+    from agent.aap_config import get_allowed_github_orgs
+    from agent.middleware.repo_protection import create_repo_protection_middleware
+
+    repo_protection_mw = create_repo_protection_middleware(
+        allowed_orgs=get_allowed_github_orgs(),
+        current_repo_owner=repo_owner,
+        current_repo_name=repo_name,
+    )
+    if repo_protection_mw:
+        middleware.append(repo_protection_mw)
+        logger.info("Added repo protection guardrail (whitelist: %s)", get_allowed_github_orgs())
+
     # Output validation (JSON structure) — kept as custom middleware
     # since JSON schema validation has no equivalent in the SDK
     if skill_id and skill_id not in ("swe-coder", ""):
@@ -249,23 +263,35 @@ Use the execute tool for all git operations.
     branch_name = current_branch_name or f"aap-open-swe/issue-{issue_number}"
 
     if has_changes:
-        if has_uncommitted:
-            # Uncommitted changes — commit them
-            sandbox.execute("git add -A")
-            sandbox.execute(f'git commit -m "fix: address issue #{issue_number}"')
-
-        if branch_name == "main" or branch_name == "master":
-            # Don't push to main — create a feature branch
-            branch_name = f"aap-open-swe/issue-{issue_number}"
-            sandbox.execute(f"git checkout -b {branch_name}")
-
-        push_result = sandbox.execute(
-            f"git push https://x-access-token:{github_token}@github.com/{repo_owner}/{repo_name}.git HEAD:refs/heads/{branch_name} --force"
-        )
-
-        if push_result.exit_code != 0:
-            logger.error("Push failed: %s", push_result.output)
+        # Validate push target against org whitelist BEFORE pushing
+        allowed_orgs = get_allowed_github_orgs()
+        if allowed_orgs and repo_owner.lower() not in allowed_orgs:
+            logger.error(
+                "BLOCKED: Cannot push to %s/%s — org '%s' not in ALLOWED_GITHUB_ORGS (%s)",
+                repo_owner,
+                repo_name,
+                repo_owner,
+                ", ".join(sorted(allowed_orgs)),
+            )
             has_changes = False
+        else:
+            if has_uncommitted:
+                # Uncommitted changes — commit them
+                sandbox.execute("git add -A")
+                sandbox.execute(f'git commit -m "fix: address issue #{issue_number}"')
+
+            if branch_name == "main" or branch_name == "master":
+                # Don't push to main — create a feature branch
+                branch_name = f"aap-open-swe/issue-{issue_number}"
+                sandbox.execute(f"git checkout -b {branch_name}")
+
+            push_result = sandbox.execute(
+                f"git push https://x-access-token:{github_token}@github.com/{repo_owner}/{repo_name}.git HEAD:refs/heads/{branch_name} --force"
+            )
+
+            if push_result.exit_code != 0:
+                logger.error("Push failed: %s", push_result.output)
+                has_changes = False
 
     # Output results for the workflow
     outputs = {
