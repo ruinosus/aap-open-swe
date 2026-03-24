@@ -366,7 +366,13 @@ Use the execute tool for all git operations.
     has_unpushed = bool(unpushed.output and unpushed.output.strip())
 
     has_changes = has_uncommitted or has_unpushed
-    branch_name = current_branch_name or f"aap-open-swe/issue-{issue_number}"
+
+    # Use skill-specific branch names
+    skill_branch_names = {
+        "aap-sizing": "aap-migration/sizing",
+        "migrate-to-aap": f"aap-migration/layer-{issue_number}",
+    }
+    branch_name = skill_branch_names.get(skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}")
 
     if has_changes:
         # Validate push target against org whitelist BEFORE pushing
