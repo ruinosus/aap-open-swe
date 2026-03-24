@@ -112,18 +112,30 @@ jobs:
           echo "Target: $TARGET_OWNER/$TARGET_NAME"
           echo "Self org: $SELF_ORG"
 
-          # Fork if external (different owner)
+          # For external repos, clone the original directly (read-only for sizing).
+          # For migration, fork first then clone the fork.
+          SKILL_ID="${{ steps.extract.outputs.skill_id }}"
+
           if [ "$TARGET_OWNER" != "$SELF_ORG" ]; then
-            echo "External repo — forking to $SELF_ORG/$TARGET_NAME"
-            gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
-            sleep 5  # wait for fork to propagate
-            CLONE_REPO="$SELF_ORG/$TARGET_NAME"
+            if [ "$SKILL_ID" = "migrate-to-aap" ]; then
+              echo "Migration: forking $TARGET_OWNER/$TARGET_NAME to $SELF_ORG"
+              gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
+              sleep 10  # wait for fork to propagate
+              CLONE_REPO="$SELF_ORG/$TARGET_NAME"
+              echo "Cloning fork $CLONE_REPO"
+              gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
+                git clone "https://github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+            else
+              echo "Sizing: cloning original $TARGET_OWNER/$TARGET_NAME (read-only)"
+              CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
+              gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
+                git clone "https://github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+            fi
           else
             CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
+            gh repo clone "$CLONE_REPO" "$TARGET_DIR" 2>/dev/null || \
+              git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
           fi
-
-          echo "Cloning $CLONE_REPO to $TARGET_DIR"
-          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
 
           # Output for next steps
           echo "target_dir=$TARGET_DIR" >> $GITHUB_OUTPUT
