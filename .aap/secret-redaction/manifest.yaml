@@ -1,0 +1,65 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: secret-redaction
+  description: Redact API keys, tokens, and credentials from agent output
+spec:
+  appliesTo:
+    kind: Module
+  phase: output
+  rules:
+    - id: aws-key
+      pattern: '(AKIA[0-9A-Z]{16})'
+      onFail: rewrite
+      replacement: '[REDACTED_AWS_KEY]'
+      message: 'AWS access key redacted'
+      category: secrets
+
+    - id: openai-key
+      pattern: '(sk-[a-zA-Z0-9\-]{20,})'
+      onFail: rewrite
+      replacement: '[REDACTED_OPENAI_KEY]'
+      message: 'OpenAI API key redacted'
+      category: secrets
+
+    - id: github-token
+      pattern: '(ghp_[a-zA-Z0-9]{36})'
+      onFail: rewrite
+      replacement: '[REDACTED_GITHUB_TOKEN]'
+      message: 'GitHub token redacted'
+      category: secrets
+
+    - id: github-app-token
+      pattern: '(ghs_[a-zA-Z0-9]{36})'
+      onFail: rewrite
+      replacement: '[REDACTED_GITHUB_APP_TOKEN]'
+      message: 'GitHub App token redacted'
+      category: secrets
+
+    - id: anthropic-key
+      pattern: '(sk-ant-[a-zA-Z0-9\-]{32,})'
+      onFail: rewrite
+      replacement: '[REDACTED_ANTHROPIC_KEY]'
+      message: 'Anthropic key redacted'
+      category: secrets
+
+    - id: bearer-token
+      pattern: '(Bearer\s+[a-zA-Z0-9\-._~+/]+=*)'
+      onFail: rewrite
+      replacement: '[REDACTED_BEARER]'
+      message: 'Bearer token redacted'
+      category: secrets
+
+    - id: connection-string
+      pattern: '((?:mongodb|postgres|mysql|redis)://[^\s]+)'
+      onFail: rewrite
+      replacement: '[REDACTED_CONNECTION_STRING]'
+      message: 'Connection string redacted'
+      category: secrets
+
+    - id: generic-api-key
+      pattern: "(?i)(api[_-]?key|secret|token|password)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]"
+      onFail: rewrite
+      replacement: '[REDACTED_CREDENTIAL]'
+      message: 'Generic credential redacted'
+      category: secrets

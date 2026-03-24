@@ -256,28 +256,10 @@ spec:
         - swe-coder
 
   # ─── Guardrails ────────────────────────────────────────────
-  guardrails:
-    input:
-      - type: regex
-        pattern: '(rm\s+-rf\s+/|DROP\s+TABLE|DELETE\s+FROM\s+\w+\s*;|truncate\s+table)'
-        action: block
-        message: 'Destructive command detected and blocked'
-
-      - type: regex
-        pattern: '(curl\s+.*\|\s*sh|wget\s+.*\|\s*bash|eval\s*\()'
-        action: block
-        message: 'Potentially unsafe command execution pattern detected'
-
-    output:
-      - type: regex
-        pattern: '(password|secret|api[_-]?key|token)\s*[:=]\s*[''"][^''"]{8,}'
-        action: block
-        message: 'Potential secret or credential in output detected'
-
-      - type: regex
-        pattern: '(AKIA[0-9A-Z]{16}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36})'
-        action: block
-        message: 'Cloud provider credential pattern detected in output'
+  # Guardrails are now defined as independent kind: Guardrail manifests
+  # in .aap/ (secret-redaction, destructive-block, unsafe-exec-block,
+  # skill-read-only, skill-docs-scope, skill-tests-scope).
+  # The SDK v0.6.0 auto-resolves them via create_guardrail_middleware().
 
   # ─── Telemetry ─────────────────────────────────────────────
   telemetry:

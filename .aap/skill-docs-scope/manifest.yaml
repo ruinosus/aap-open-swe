@@ -1,0 +1,27 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: skill-docs-scope
+  description: Restrict doc skills to .md files only
+spec:
+  appliesTo:
+    kind: Skill
+    when: "id in ('project-docs', 'doc-generator')"
+  phase: input
+  rules:
+    - id: docs-scope
+      category: scope
+      onFail: block
+      message: 'Doc skills can only modify documentation files'
+  scope:
+    allow_writes: true
+    allowed_patterns:
+      - '*.md'
+      - 'docs/*.md'
+      - 'docs/**/*.md'
+    blocked_patterns:
+      - '.github/*'
+      - '.aap/*'
+      - '*.py'
+      - '*.yaml'
+      - '*.yml'

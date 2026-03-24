@@ -1,0 +1,15 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: destructive-block
+  description: Block destructive commands in agent input
+spec:
+  appliesTo:
+    kind: Module
+  phase: input
+  rules:
+    - id: destructive-commands
+      pattern: '(rm\s+-rf\s+/|DROP\s+TABLE|DELETE\s+FROM\s+\w+\s*;|truncate\s+table)'
+      onFail: block
+      message: 'Destructive command detected and blocked'
+      category: safety

@@ -1,0 +1,24 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: skill-tests-scope
+  description: Restrict test-generator to test files only
+spec:
+  appliesTo:
+    kind: Skill
+    when: "id == 'test-generator'"
+  phase: input
+  rules:
+    - id: tests-scope
+      category: scope
+      onFail: block
+      message: 'Test generator can only create/modify test files'
+  scope:
+    allow_writes: true
+    allowed_patterns:
+      - 'tests/*.py'
+      - 'test_*.py'
+    blocked_patterns:
+      - '.github/*'
+      - '.aap/*'
+      - 'agent/*'

@@ -21,6 +21,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
 
     from agent.aap_config import (
         get_agent_instruction,
+        get_manifest,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
@@ -129,53 +130,28 @@ Use the execute tool for all git operations.
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    # Build middleware stack — manifest guardrails always active,
-    # skill-specific guardrails added when SKILL_ID is set.
+    # Build guardrail middleware from AAP SDK v0.6.0.
+    # Automatically resolves kind: Guardrail manifests from .aap/ and applies
+    # PII detection, secret redaction, destructive command blocking, and
+    # per-skill file scope enforcement — all from YAML, no custom Python.
     middleware = []
-
-    # AAP SDK guardrail middleware (PII detection: email, CPF, phone, credit card)
     try:
-        from cockpit_aap import GuardrailMiddleware, RegexGuardrailAdapter
+        from cockpit_aap import create_guardrail_middleware
 
-        sdk_adapter = RegexGuardrailAdapter()
-        sdk_guardrail = GuardrailMiddleware(
-            guardrail=sdk_adapter, module_id="open-swe", agent_id=skill_id or "swe-coder"
+        guardrail_mw = create_guardrail_middleware(
+            get_manifest(),
+            include_builtin_pii=True,
         )
-        middleware.append(sdk_guardrail)
-        logger.info("Added AAP SDK guardrail middleware (PII detection)")
+        middleware.append(guardrail_mw)
+        logger.info("Added SDK guardrail middleware (manifest + PII)")
     except Exception:
-        logger.warning("Could not load AAP SDK guardrail middleware", exc_info=True)
+        logger.warning("Could not create SDK guardrail middleware", exc_info=True)
 
-    # Manifest guardrails (regex patterns from .aap/open-swe/manifest.yaml)
-    from agent.middleware.manifest_guardrails import (
-        create_manifest_input_guardrail,
-        create_manifest_output_guardrail,
-    )
-
-    manifest_input_mw = create_manifest_input_guardrail()
-    if manifest_input_mw:
-        middleware.append(manifest_input_mw)
-
-    manifest_output_mw = create_manifest_output_guardrail()
-    if manifest_output_mw:
-        middleware.append(manifest_output_mw)
-
-    # Skill-specific guardrails — only when SKILL_ID is set
+    # Output validation (JSON structure) — kept as custom middleware
+    # since JSON schema validation has no equivalent in the SDK
     if skill_id and skill_id not in ("swe-coder", ""):
         from agent.middleware.output_validator import create_output_validator
-        from agent.middleware.secret_filter import secret_filter
-        from agent.middleware.skill_file_scope import create_skill_file_scope_middleware
 
-        # 1. File scope enforcement (before_model)
-        file_scope_mw = create_skill_file_scope_middleware(skill_id)
-        if file_scope_mw:
-            middleware.append(file_scope_mw)
-            logger.info("Added file scope guardrail for skill %s", skill_id)
-
-        # 2. Secret redaction (after_agent) — always active for skills
-        middleware.append(secret_filter)
-
-        # 3. Output validation (after_agent)
         output_mw = create_output_validator(skill_id)
         if output_mw:
             middleware.append(output_mw)

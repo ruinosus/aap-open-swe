@@ -1,0 +1,15 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: unsafe-exec-block
+  description: Block unsafe command execution patterns
+spec:
+  appliesTo:
+    kind: Module
+  phase: input
+  rules:
+    - id: pipe-to-shell
+      pattern: '(curl\s+.*\|\s*sh|wget\s+.*\|\s*bash|eval\s*\()'
+      onFail: block
+      message: 'Unsafe command execution pattern detected'
+      category: safety

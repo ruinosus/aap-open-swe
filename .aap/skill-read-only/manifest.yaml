@@ -1,0 +1,17 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: skill-read-only
+  description: Enforce read-only mode for review skills
+spec:
+  appliesTo:
+    kind: Skill
+    when: "id in ('code-review', 'security-scan')"
+  phase: input
+  rules:
+    - id: read-only
+      category: scope
+      onFail: block
+      message: 'Review skills are read-only and cannot modify files'
+  scope:
+    allow_writes: false

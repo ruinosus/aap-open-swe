@@ -456,16 +456,16 @@ wheels = [
 
 [[package]]
 name = "cockpit-aap-sdk"
-version = "0.5.0"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pyyaml" },
     { name = "simpleeval" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/15/69f26ba9d458d6cc8a36736aa276b0a945fe3748db9428e40dc9a1cd26e9/cockpit_aap_sdk-0.5.0.tar.gz", hash = "sha256:60118ddf7608cbdaa37e95ba2af98fde03b1159d2e099173d08a7481d1648786", size = 582103, upload-time = "2026-03-23T15:52:35.54Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/48/f609ca34281c93fd9ee3a5095b148a8cd20a4bf2aebeafb30ecbab7312f1/cockpit_aap_sdk-0.6.0.tar.gz", hash = "sha256:e4c7c0187a38165d4517a82a7ea4ea626d65abbdd0b37c41c26ee97df374bfb2", size = 594994, upload-time = "2026-03-24T13:15:05.543Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/dc/574cc97333800d3f63be34de729e202ad79c56d87c6b6ddd2158b5a44415/cockpit_aap_sdk-0.5.0-py3-none-any.whl", hash = "sha256:1a9da5acdd6cf852d63c7e7b32061ab489fda0ee32f58e74ce479c9df1f86a7d", size = 347127, upload-time = "2026-03-23T15:52:34.114Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/6f/dfe4e8858d3b3828cc9a3ecae811e5688ccdfca5bb1e2105f82317210b07/cockpit_aap_sdk-0.6.0-py3-none-any.whl", hash = "sha256:4d17b409cba9c208b41de5f0d74cdb04f86569c8a1e8430900aa764ff070d81d", size = 353980, upload-time = "2026-03-24T13:15:03.848Z" },
 ]
 
 [[package]]
@@ -1806,7 +1806,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cockpit-aap-sdk" },
+    { name = "cockpit-aap-sdk", specifier = ">=0.6.0" },
     { name = "cryptography", specifier = ">=41.0.0" },
     { name = "deepagents", specifier = ">=0.4.3" },
     { name = "fastapi", specifier = ">=0.104.0" },
