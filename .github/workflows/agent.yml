@@ -84,6 +84,12 @@ jobs:
             const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
             core.setOutput('skill_id', skillId);
 
+            // Detect --repo=owner/name or repo URL for cross-repo operations
+            const repoMatch = task.match(/--repo[= ]([^\s]+)/i)
+              || task.match(/https?:\/\/github\.com\/([^\/\s]+\/[^\/\s]+)/i);
+            const targetRepo = repoMatch ? repoMatch[1].replace(/\.git$/, '').replace(/^https?:\/\/github\.com\//, '') : '';
+            core.setOutput('target_repo', targetRepo);
+
             // Get issue title and body for context
             const issue = context.payload.issue;
             const fullTask = `Issue #${issue.number}: ${issue.title}\n\n${issue.body || ''}\n\nUser request: ${task}`;
@@ -91,14 +97,48 @@ jobs:
             core.setOutput('task', fullTask);
             core.setOutput('issue_number', issue.number);
 
+      - name: Fork and clone target repo
+        id: target
+        if: steps.extract.outputs.target_repo != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_REPO: ${{ steps.extract.outputs.target_repo }}
+        run: |
+          TARGET_OWNER="${TARGET_REPO%%/*}"
+          TARGET_NAME="${TARGET_REPO##*/}"
+          SELF_ORG="${{ github.repository_owner }}"
+          TARGET_DIR="/tmp/aap-target-repo"
+
+          echo "Target: $TARGET_OWNER/$TARGET_NAME"
+          echo "Self org: $SELF_ORG"
+
+          # Fork if external (different owner)
+          if [ "$TARGET_OWNER" != "$SELF_ORG" ]; then
+            echo "External repo — forking to $SELF_ORG/$TARGET_NAME"
+            gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
+            sleep 5  # wait for fork to propagate
+            CLONE_REPO="$SELF_ORG/$TARGET_NAME"
+          else
+            CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
+          fi
+
+          echo "Cloning $CLONE_REPO to $TARGET_DIR"
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+
+          # Output for next steps
+          echo "target_dir=$TARGET_DIR" >> $GITHUB_OUTPUT
+          echo "target_owner=${CLONE_REPO%%/*}" >> $GITHUB_OUTPUT
+          echo "target_name=${CLONE_REPO##*/}" >> $GITHUB_OUTPUT
+          echo "is_fork=$( [ "$TARGET_OWNER" != "$SELF_ORG" ] && echo true || echo false )" >> $GITHUB_OUTPUT
+
       - name: Run agent
         id: agent
         env:
           TASK: ${{ steps.extract.outputs.task }}
           SKILL_ID: ${{ steps.extract.outputs.skill_id }}
-          REPO_DIR: ${{ github.workspace }}
-          REPO_OWNER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_DIR: ${{ steps.target.outputs.target_dir || github.workspace }}
+          REPO_OWNER: ${{ steps.target.outputs.target_owner || github.repository_owner }}
+          REPO_NAME: ${{ steps.target.outputs.target_name || github.event.repository.name }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           PR_NUMBER: ${{ github.event.issue.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,9 +146,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'openai:gpt-4o' }}
           SANDBOX_TYPE: local
+          SOURCE_ISSUE_REPO: ${{ github.repository }}
+          SOURCE_ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=${{ github.workspace }} python agent/run_standalone.py
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -118,12 +160,22 @@ jobs:
           script: |
             const branch = '${{ steps.agent.outputs.branch_name }}';
             const issueNumber = ${{ steps.extract.outputs.issue_number }};
+            const skillId = '${{ steps.extract.outputs.skill_id }}';
+
+            // Use target repo if cross-repo operation, otherwise current repo
+            const targetOwner = '${{ steps.target.outputs.target_owner }}' || context.repo.owner;
+            const targetName = '${{ steps.target.outputs.target_name }}' || context.repo.repo;
+
+            // PR title based on skill
+            let prTitle = `fix: address issue #${issueNumber}`;
+            if (skillId === 'migrate-to-aap') prTitle = `feat: AAP SDK migration`;
+            if (skillId === 'aap-sizing') prTitle = `docs: AAP SDK sizing report`;
 
             // Check if PR already exists
             const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: `${context.repo.owner}:${branch}`,
+              owner: targetOwner,
+              repo: targetName,
+              head: `${targetOwner}:${branch}`,
               state: 'open'
             });
 
@@ -133,10 +185,10 @@ jobs:
               core.info(`PR already exists: ${prUrl}`);
             } else {
               const { data: pr } = await github.rest.pulls.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `fix: address issue #${issueNumber}`,
-                body: `## Description\nAutomated fix for #${issueNumber} by AAP Open SWE agent.\n\nCloses #${issueNumber}`,
+                owner: targetOwner,
+                repo: targetName,
+                title: prTitle,
+                body: `## Description\nAutomated by AAP Open SWE agent (${skillId || 'swe-coder'}).\n\nTriggered from ${context.repo.owner}/${context.repo.repo}#${issueNumber}`,
                 head: branch,
                 base: 'main',
                 draft: true
