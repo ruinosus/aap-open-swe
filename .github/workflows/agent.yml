@@ -162,6 +162,16 @@ jobs:
             git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
           fi
 
+          # For migrate: merge the sizing branch so the report is available
+          if [ "$SKILL_ID" = "migrate-to-aap" ] && [ -d "$TARGET_DIR" ]; then
+            cd "$TARGET_DIR"
+            git fetch origin aap-migration/sizing 2>/dev/null && \
+              git merge origin/aap-migration/sizing --no-edit 2>/dev/null && \
+              echo "Merged aap-migration/sizing branch (contains sizing report)" || \
+              echo "No sizing branch found — migrate will fail if report is missing"
+            cd -
+          fi
+
           # Output for next steps
           echo "target_dir=$TARGET_DIR" >> $GITHUB_OUTPUT
           echo "target_owner=${CLONE_REPO%%/*}" >> $GITHUB_OUTPUT
