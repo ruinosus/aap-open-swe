@@ -43,7 +43,7 @@ def test_generate_thread_id_from_github_issue_is_deterministic() -> None:
 
 def test_build_github_issue_prompt_includes_issue_context() -> None:
     prompt = webapp.build_github_issue_prompt(
-        {"owner": "langchain-ai", "name": "open-swe"},
+        {"owner": "ruinosus", "name": "open-swe"},
         42,
         "12345",
         "Fix the flaky test",
@@ -88,7 +88,7 @@ def test_github_webhook_accepts_issue_events(monkeypatch) -> None:
                 "title": "@openswe fix the flaky test",
                 "body": "The test is failing intermittently.",
             },
-            "repository": {"owner": {"login": "langchain-ai"}, "name": "open-swe"},
+            "repository": {"owner": {"login": "ruinosus"}, "name": "open-swe"},
             "sender": {"login": "octocat"},
         },
     )
@@ -121,7 +121,7 @@ def test_github_webhook_ignores_issue_events_without_body_or_title_change(monkey
                 "title": "@openswe fix the flaky test",
                 "body": "The test is failing intermittently.",
             },
-            "repository": {"owner": {"login": "langchain-ai"}, "name": "open-swe"},
+            "repository": {"owner": {"login": "ruinosus"}, "name": "open-swe"},
             "sender": {"login": "octocat"},
         },
     )
@@ -148,7 +148,7 @@ def test_github_webhook_accepts_issue_comment_events(monkeypatch) -> None:
         {
             "issue": {"id": 12345, "number": 42, "title": "Fix the flaky test"},
             "comment": {"body": "@openswe please handle this"},
-            "repository": {"owner": {"login": "langchain-ai"}, "name": "open-swe"},
+            "repository": {"owner": {"login": "ruinosus"}, "name": "open-swe"},
             "sender": {"login": "octocat"},
         },
     )
@@ -219,10 +219,10 @@ def test_process_github_issue_uses_resolved_user_token_for_reaction(monkeypatch)
                     "number": 42,
                     "title": "Fix the flaky test",
                     "body": "The test is failing intermittently.",
-                    "html_url": "https://github.com/langchain-ai/open-swe/issues/42",
+                    "html_url": "https://github.com/ruinosus/open-swe/issues/42",
                 },
                 "comment": {"id": 999, "body": "@openswe please handle this"},
-                "repository": {"owner": {"login": "langchain-ai"}, "name": "open-swe"},
+                "repository": {"owner": {"login": "ruinosus"}, "name": "open-swe"},
                 "sender": {"login": "octocat"},
             },
             "issue_comment",
@@ -297,14 +297,14 @@ def test_process_github_issue_existing_thread_uses_followup_prompt(monkeypatch) 
                     "number": 42,
                     "title": "Fix the flaky test",
                     "body": "The test is failing intermittently.",
-                    "html_url": "https://github.com/langchain-ai/open-swe/issues/42",
+                    "html_url": "https://github.com/ruinosus/open-swe/issues/42",
                 },
                 "comment": {
                     "id": 999,
                     "body": "@openswe please handle this",
                     "user": {"login": "octocat"},
                 },
-                "repository": {"owner": {"login": "langchain-ai"}, "name": "open-swe"},
+                "repository": {"owner": {"login": "ruinosus"}, "name": "open-swe"},
                 "sender": {"login": "octocat"},
             },
             "issue_comment",

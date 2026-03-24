@@ -91,6 +91,22 @@ spec:
       auto_invoke:
         triggers: ["tests", "test coverage", "generate tests", "needs-tests", "add tests"]
 
+    - id: aap-sizing
+      name: AAP SDK Sizing
+      description: Analyzes a repository and generates an AAP SDK migration report with findings organized in 5 layers
+      instruction: skills/aap-sizing.md
+      trigger: on_demand
+      auto_invoke:
+        triggers: ["sizing", "migration report", "analyze repo", "migration analysis", "aap sizing"]
+
+    - id: migrate-to-aap
+      name: AAP SDK Migration
+      description: Migrates a repository to AAP SDK manifest-driven architecture in incremental layers
+      instruction: skills/migrate-to-aap.md
+      trigger: on_demand
+      auto_invoke:
+        triggers: ["migrate", "migration", "migrate to aap", "aap migration", "migrate layer"]
+
   # ─── Artifacts (Configuration) ─────────────────────────────
   artifacts:
     # Model configuration

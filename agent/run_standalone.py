@@ -175,8 +175,9 @@ Use the execute tool for all git operations.
     # PR-type skills need tools (execute, read_file, write_file, etc.) to
     # make changes, commit, and push. Review skills only need to analyze and
     # return JSON, so tools=[] is fine (faster, no tool overhead).
-    pr_skills = ("doc-generator", "test-generator", "project-docs")
-    use_default_tools = skill_id in pr_skills
+    pr_skills = ("doc-generator", "test-generator", "project-docs", "migrate-to-aap")
+    analysis_skills = ("aap-sizing",)  # read-only but needs execute for grep/find
+    use_default_tools = skill_id in pr_skills or skill_id in analysis_skills
 
     agent = create_deep_agent(
         model=model,

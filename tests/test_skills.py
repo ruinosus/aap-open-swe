@@ -13,13 +13,15 @@ def test_get_skills_loads_4_skills():
 
     _load_manifest.cache_clear()
     skills = get_skills()
-    assert len(skills) == 5
+    assert len(skills) == 7
     ids = [s.id for s in skills]
     assert "code-review" in ids
     assert "security-scan" in ids
     assert "doc-generator" in ids
     assert "test-generator" in ids
     assert "project-docs" in ids
+    assert "aap-sizing" in ids
+    assert "migrate-to-aap" in ids
 
 
 def test_get_skill_by_id():

@@ -1,0 +1,17 @@
+apiVersion: governance.cockpit.io/v1
+kind: Guardrail
+metadata:
+  name: sizing-read-only
+  description: Ensures aap-sizing skill cannot modify any files (analysis only)
+spec:
+  appliesTo:
+    kind: Skill
+    when: "id == 'aap-sizing'"
+  phase: input
+  rules:
+    - id: read-only
+      category: scope
+      onFail: block
+      message: 'Sizing skill is read-only and cannot modify files'
+  scope:
+    allow_writes: false

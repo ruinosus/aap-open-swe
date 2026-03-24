@@ -62,6 +62,62 @@ class PROutput(_StrictSchema):
     )
 
 
+class SizingFinding(_StrictSchema):
+    """A single finding from repository analysis."""
+
+    layer: int = Field(description="Migration layer (1-5)")
+    category: str = Field(
+        description="Finding category: prompt, model_config, tool, hitl, i18n, theme, connection, guardrail, form, persona"
+    )
+    file: str = Field(description="Relative file path")
+    line: int = Field(description="Line number")
+    description: str = Field(description="Human-readable finding description")
+    impact: str = Field(description="One of: high, medium, low")
+    code_snippet: str = Field(description="First 200 chars of matched code")
+    language: str = Field(description="Source language: python or typescript")
+
+
+class SizingLayerSummary(_StrictSchema):
+    """Summary for one migration layer."""
+
+    layer: int = Field(description="Layer number (1-5)")
+    name: str = Field(description="Layer name: core, tools, frontend, governance, polish")
+    findings_count: int = Field(description="Number of findings in this layer")
+    estimated_effort: str = Field(description="Estimated effort (e.g., '2-3h')")
+    is_breaking: bool = Field(description="Whether this layer modifies functional code")
+    applicable: bool = Field(description="False if no findings for this layer")
+
+
+class SizingOutput(_StrictSchema):
+    """Structured output for the aap-sizing skill."""
+
+    skill_output_type: str = Field(default="sizing", description="Always 'sizing'")
+    repo_url: str = Field(description="Repository URL analyzed")
+    repo_type: str = Field(description="'internal' or 'external'")
+    languages: list[str] = Field(default_factory=list, description="Languages detected")
+    total_findings: int = Field(description="Total number of findings")
+    findings: list[SizingFinding] = Field(default_factory=list, description="All findings")
+    layers: list[SizingLayerSummary] = Field(
+        default_factory=list, description="Per-layer summaries"
+    )
+    proposed_structure: list[str] = Field(
+        default_factory=list, description="Proposed .aap/ file paths"
+    )
+
+
+class MigrationOutput(_StrictSchema):
+    """Structured output for the migrate-to-aap skill."""
+
+    skill_output_type: str = Field(default="migration", description="Always 'migration'")
+    layer: int = Field(description="Layer number executed (1-5)")
+    layer_name: str = Field(description="Layer name")
+    summary: str = Field(description="Summary of changes made")
+    files_created: list[str] = Field(default_factory=list, description="New files created")
+    files_modified: list[str] = Field(default_factory=list, description="Existing files modified")
+    branch: str = Field(default="", description="Branch name")
+    is_breaking: bool = Field(default=False, description="Whether changes are breaking")
+
+
 # Map skill IDs to their expected output schema
 SKILL_SCHEMAS: dict[str, type[BaseModel]] = {
     "code-review": ReviewOutput,
@@ -69,4 +125,6 @@ SKILL_SCHEMAS: dict[str, type[BaseModel]] = {
     "doc-generator": PROutput,
     "test-generator": PROutput,
     "project-docs": PROutput,
+    "aap-sizing": SizingOutput,
+    "migrate-to-aap": MigrationOutput,
 }
