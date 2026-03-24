@@ -148,6 +148,7 @@ jobs:
             core.setOutput('pr_url', prUrl);
 
       - name: Comment on issue
+        if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
         uses: actions/github-script@v7
@@ -261,6 +262,7 @@ jobs:
             core.setOutput('pr_url', pr.html_url);
 
       - name: Comment on issue
+        if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
         uses: actions/github-script@v7
@@ -371,6 +373,7 @@ jobs:
             core.setOutput('pr_url', pr.html_url);
 
       - name: Comment on issue
+        if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
         uses: actions/github-script@v7
@@ -481,6 +484,7 @@ jobs:
             core.setOutput('pr_url', pr.html_url);
 
       - name: Comment on issue
+        if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
         uses: actions/github-script@v7
@@ -847,6 +851,7 @@ jobs:
             core.setOutput('pr_url', pr.html_url);
 
       - name: Comment on issue
+        if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
         uses: actions/github-script@v7
