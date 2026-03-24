@@ -131,7 +131,7 @@ spec:
     # GitHub allowed orgs (comma-separated)
     - key: open-swe.config.allowed_github_orgs
       category: configuration
-      defaultValue: ''
+      defaultValue: 'ruinosus'
 
     # Sandbox configuration
     - key: open-swe.config.sandbox_type
