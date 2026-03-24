@@ -124,11 +124,16 @@ jobs:
 
           if [ "$TARGET_OWNER" != "$SELF_ORG" ]; then
             if [ "$SKILL_ID" = "migrate-to-aap" ] && [ -n "$CROSS_TOKEN" ]; then
-              echo "Migration: forking $TARGET_OWNER/$TARGET_NAME to $SELF_ORG"
-              GITHUB_TOKEN="$CROSS_TOKEN" gh repo fork "$TARGET_OWNER/$TARGET_NAME" --org "$SELF_ORG" --clone=false 2>/dev/null || true
-              sleep 10  # wait for fork to propagate
               CLONE_REPO="$SELF_ORG/$TARGET_NAME"
-              echo "Cloning fork $CLONE_REPO"
+              # Check if fork already exists
+              if GITHUB_TOKEN="$CROSS_TOKEN" gh repo view "$CLONE_REPO" --json url > /dev/null 2>&1; then
+                echo "Fork $CLONE_REPO already exists"
+              else
+                echo "Forking $TARGET_OWNER/$TARGET_NAME to $SELF_ORG"
+                GITHUB_TOKEN="$CROSS_TOKEN" gh repo fork "$TARGET_OWNER/$TARGET_NAME" --clone=false 2>&1 || true
+                sleep 15  # wait for fork to propagate
+              fi
+              echo "Cloning $CLONE_REPO"
               git clone "https://x-access-token:${CROSS_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
             elif [ "$SKILL_ID" = "migrate-to-aap" ] && [ -z "$CROSS_TOKEN" ]; then
               echo "ERROR: Migration to external repos requires CROSS_REPO_PAT secret."
