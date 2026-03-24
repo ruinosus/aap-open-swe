@@ -141,8 +141,21 @@ jobs:
               echo "with Contents (read/write), Pull requests (read/write), Administration (read)."
               exit 1
             else
-              echo "Sizing: cloning $TARGET_OWNER/$TARGET_NAME (public, read-only)"
-              git clone "https://github.com/${TARGET_OWNER}/${TARGET_NAME}.git" "$TARGET_DIR"
+              echo "Sizing: cloning $TARGET_OWNER/$TARGET_NAME"
+              if [ -n "$CROSS_TOKEN" ]; then
+                # Clone via PAT so the agent can push the report to a branch
+                CLONE_REPO="$SELF_ORG/$TARGET_NAME"
+                # Ensure fork exists for sizing too (to push the report)
+                if ! GITHUB_TOKEN="$CROSS_TOKEN" gh repo view "$CLONE_REPO" --json url > /dev/null 2>&1; then
+                  GITHUB_TOKEN="$CROSS_TOKEN" gh repo fork "$TARGET_OWNER/$TARGET_NAME" --clone=false 2>&1 || true
+                  sleep 15
+                fi
+                git clone "https://x-access-token:${CROSS_TOKEN}@github.com/${CLONE_REPO}.git" "$TARGET_DIR"
+              else
+                # No PAT — clone public repo read-only (report won't be pushed)
+                git clone "https://github.com/${TARGET_OWNER}/${TARGET_NAME}.git" "$TARGET_DIR"
+                CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
+              fi
             fi
           else
             CLONE_REPO="$TARGET_OWNER/$TARGET_NAME"
@@ -165,7 +178,7 @@ jobs:
           REPO_NAME: ${{ steps.target.outputs.target_name || github.event.repository.name }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           PR_NUMBER: ${{ github.event.issue.number }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.extract.outputs.target_repo != '' && secrets.CROSS_REPO_PAT || secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'openai:gpt-4o' }}
