@@ -38,7 +38,6 @@ class ProgressReporter:
         self._phases: list[dict] = []
         self._tool_calls = 0
         self._start_time = time.time()
-        self._last_tool = ""
         # Token tracking — populated from streaming callback
         self.input_tokens = 0
         self.output_tokens = 0
@@ -70,9 +69,8 @@ class ProgressReporter:
         self._post()
 
     def log_tool_call(self, tool_name: str, snippet: str = "") -> None:
-        """Log a tool call (increments counter, updates last tool)."""
+        """Log a tool call (increments counter)."""
         self._tool_calls += 1
-        self._last_tool = tool_name
         if self._tool_calls % 5 == 0:
             self._post()
 
@@ -161,17 +159,22 @@ class ProgressReporter:
             "Accept": "application/vnd.github+json",
         }
         if "/" not in self.source_repo:
+            logger.debug("Invalid source_repo for _post_body: %s", self.source_repo)
             return
         source_owner, source_name = self.source_repo.split("/", 1)
         try:
             if self.comment_id:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/comments/{self.comment_id}"
-                requests.patch(url, headers=headers, json={"body": body}, timeout=10)
+                resp = requests.patch(url, headers=headers, json={"body": body}, timeout=10)
+                if not resp.ok:
+                    logger.debug("_post_body PATCH failed: %s", resp.status_code)
             else:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/{self.issue_number}/comments"
                 resp = requests.post(url, headers=headers, json={"body": body}, timeout=10)
                 if resp.ok:
                     self.comment_id = resp.json().get("id")
+                else:
+                    logger.debug("_post_body POST failed: %s", resp.status_code)
         except Exception:
             logger.debug("Failed to post body", exc_info=True)
 

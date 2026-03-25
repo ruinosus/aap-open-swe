@@ -1,5 +1,6 @@
 """Build structured execution reports for agent runs."""
 
+import json
 import time
 
 
@@ -125,8 +126,6 @@ def _extract_summary(
     pr_url: str,
 ) -> str:
     """Extract a human-readable summary of what the agent did."""
-    import json
-
     # Try to parse structured output
     data = None
     try:

@@ -518,10 +518,13 @@ Use the execute tool for all git operations.
     progress.finalize(success=True, execution_report=execution_report)
 
     # Output results for the workflow
+    # agent_response keeps the raw output for downstream JSON parsing
+    # execution_report is the formatted markdown for issue comments
     outputs = {
         "has_changes": has_changes,
         "branch_name": branch_name if has_changes else "",
         "agent_response": execution_report[:60000],
+        "agent_response_raw": agent_response[:60000],
     }
 
     github_output = os.environ.get("GITHUB_OUTPUT", "")

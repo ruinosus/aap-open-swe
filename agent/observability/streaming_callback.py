@@ -162,9 +162,7 @@ class TokenStats:
 
     @property
     def llm_calls(self) -> int:
-        return sum(
-            v.get("total_tokens", 0) > 0 for v in self._usage_cb.usage_metadata.values()
-        ) or len(self._usage_cb.usage_metadata)
+        return len(self._usage_cb.usage_metadata)
 
     @property
     def tool_calls(self) -> int:
