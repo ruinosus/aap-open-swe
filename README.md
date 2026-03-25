@@ -23,6 +23,15 @@ Alem disso, possui **5 skills dinamicas** que ativam automaticamente:
 
 Built on [LangGraph](https://langchain-ai.github.io/langgraph/) + [Deep Agents](https://github.com/langchain-ai/deepagents).
 
+## Usage
+
+See [USAGE.md](USAGE.md) for the full usage guide. It covers:
+- how to invoke the agent via GitHub issues and PR comments
+- the available skills and example prompts
+- the automatic PR review and security scan triggers
+- the execution report format
+- model configuration with `OPEN_SWE_MODEL`
+
 ## Quick Start
 
 ```bash
@@ -138,16 +147,16 @@ Skills sao declarativas — adicionar uma nova requer apenas um markdown + entra
   project-docs.md      -> PR merged     -> draft PR com .md updates
 ```
 
-On-demand via comentario: `@aap-open-swe review`, `@aap-open-swe security`, `@aap-open-swe docs`, `@aap-open-swe tests`
+On-demand via comentario: `@aap-open-swe review`, `@aap-open-swe security`, `@aap-open-swe docs`, `@aap-open-swe tests`, `@aap-open-swe project-docs`, `@aap-open-swe sizing`, `@aap-open-swe migrate`, `@aap-open-swe respond-review`
 
 ## Environment Variables
 
-See `.env.example` for the full list. Key variables:
+See `USAGE.md` and `.env.example` for the full list. Key variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | Yes | LLM provider API key |
-| `OPEN_SWE_MODEL` | No | Model ID (default: `anthropic:claude-opus-4-6`) |
+| `OPEN_SWE_MODEL` | No | Model ID used by the agent (for example `anthropic:claude-opus-4-6`) |
 | `SANDBOX_TYPE` | No | `langsmith`, `local`, `daytona`, `modal`, `runloop` |
 | `GITHUB_APP_ID` | For GitHub trigger | GitHub App ID |
 | `DEFAULT_REPO_OWNER` | No | Default GitHub org |
