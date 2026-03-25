@@ -52,7 +52,7 @@ class AgentStreamingCallback(BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> None:
-        out_str = str(output)
+        out_str = _sanitize(str(output))
         if len(out_str) > 500:
             print(out_str[:500], flush=True)
             print(f"... ({len(out_str)} chars total)", flush=True)

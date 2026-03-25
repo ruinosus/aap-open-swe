@@ -118,10 +118,9 @@ def respond_to_review(
         path = comment.get("path", "")
         body = comment.get("body", "")
 
-        # Skip if we already replied
+        # Skip if there are already any replies (from human or bot)
         existing_replies = replies_by_parent.get(comment_id, [])
-        our_replies = [r for r in existing_replies if r.get("user", {}).get("login") != bot_login]
-        if our_replies:
+        if existing_replies:
             stats["already_replied"] += 1
             stats["skipped"] += 1
             continue

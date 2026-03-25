@@ -482,7 +482,7 @@ Use the execute tool for all git operations.
         agent_response = _format_sizing_markdown(agent_response)
 
     # Finalize progress reporter — success means agent ran without crash
-    progress.finalize(success=True, result=agent_response[:500])
+    progress.finalize(success=True)
 
     # Output results for the workflow
     outputs = {
