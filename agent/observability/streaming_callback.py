@@ -1,4 +1,4 @@
-"""LangChain callback handler that captures tool calls and token usage."""
+"""LangChain callback handler for GH Actions log groups + token tracking."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 
 from .gh_actions import _sanitize, gh_error
 
 logger = logging.getLogger("streaming_callback")
 
-# Pricing per 1M tokens (USD) — source: models.dev
+# Pricing per 1M tokens (USD) — source: github.com/anomalyco/models.dev
 MODEL_PRICING: dict[str, dict[str, float]] = {
     # Anthropic
     "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
@@ -34,12 +34,10 @@ def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> flo
     # Strip provider prefix (e.g., "anthropic:claude-sonnet-4-6" -> "claude-sonnet-4-6")
     clean_name = model_name.split(":")[-1] if ":" in model_name else model_name
 
-    # Try exact match
     pricing = MODEL_PRICING.get(clean_name)
     if not pricing:
-        # Try substring match
         for key, val in MODEL_PRICING.items():
-            if key in clean_name or clean_name in key:
+            if clean_name.startswith(key) or key.startswith(clean_name):
                 pricing = val
                 break
     if not pricing:
@@ -48,31 +46,17 @@ def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> flo
 
 
 class AgentStreamingCallback(BaseCallbackHandler):
-    """Callback handler that emits GitHub Actions log groups per tool call,
-    tracks token usage, and feeds progress updates to ProgressReporter.
+    """Emits GitHub Actions log groups per tool/LLM call and tracks tool counts.
 
-    Usage:
-        callback = AgentStreamingCallback(progress_reporter=reporter)
-        agent.ainvoke(input, config={"callbacks": [callback]})
+    Token tracking is delegated to UsageMetadataCallbackHandler (langchain built-in).
+    Use `create_callbacks()` to get both handlers wired together.
     """
 
     def __init__(self, progress_reporter=None):
         super().__init__()
         self.progress_reporter = progress_reporter
         self.tool_call_count = 0
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.llm_calls = 0
-        self._model_name = ""
         self._active_groups: dict[UUID, str] = {}
-
-    @property
-    def total_tokens(self) -> int:
-        return self.total_input_tokens + self.total_output_tokens
-
-    @property
-    def estimated_cost(self) -> float | None:
-        return estimate_cost(self._model_name, self.total_input_tokens, self.total_output_tokens)
 
     def on_tool_start(
         self,
@@ -91,13 +75,7 @@ class AgentStreamingCallback(BaseCallbackHandler):
         if self.progress_reporter:
             self.progress_reporter.log_tool_call(tool_name, snippet)
 
-    def on_tool_end(
-        self,
-        output: str,
-        *,
-        run_id: UUID,
-        **kwargs: Any,
-    ) -> None:
+    def on_tool_end(self, output: str, *, run_id: UUID, **kwargs: Any) -> None:
         out_str = _sanitize(str(output))
         if len(out_str) > 500:
             print(out_str[:500], flush=True)
@@ -105,13 +83,7 @@ class AgentStreamingCallback(BaseCallbackHandler):
         print("::endgroup::", flush=True)
         self._active_groups.pop(run_id, None)
 
-    def on_tool_error(
-        self,
-        error: BaseException,
-        *,
-        run_id: UUID,
-        **kwargs: Any,
-    ) -> None:
+    def on_tool_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         tool_name = self._active_groups.pop(run_id, "unknown")
         gh_error(f"Tool {tool_name} failed: {error}")
         print("::endgroup::", flush=True)
@@ -126,8 +98,6 @@ class AgentStreamingCallback(BaseCallbackHandler):
     ) -> None:
         model_id = serialized.get("id", ["unknown"])
         model_name = model_id[-1] if isinstance(model_id, list) else str(model_id)
-        if not self._model_name:
-            self._model_name = model_name
         msg_count = sum(len(batch) for batch in messages if isinstance(batch, list))
         print(
             f"::group::LLM call — {_sanitize(model_name)} ({msg_count} messages)",
@@ -136,9 +106,6 @@ class AgentStreamingCallback(BaseCallbackHandler):
         self._active_groups[run_id] = "llm"
 
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
-        self.llm_calls += 1
-        self._extract_token_usage(response)
-
         if run_id in self._active_groups:
             print("::endgroup::", flush=True)
             self._active_groups.pop(run_id, None)
@@ -149,43 +116,69 @@ class AgentStreamingCallback(BaseCallbackHandler):
             print("::endgroup::", flush=True)
             self._active_groups.pop(run_id, None)
 
-    def _extract_token_usage(self, response: Any) -> None:
-        """Extract token usage from LLMResult — supports OpenAI and Anthropic."""
-        # Strategy 1: llm_output.token_usage (OpenAI pattern)
-        llm_output = getattr(response, "llm_output", None) or {}
-        usage = llm_output.get("token_usage") or llm_output.get("usage") or {}
-        if usage:
-            self.total_input_tokens += usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
-            self.total_output_tokens += usage.get("completion_tokens", 0) or usage.get(
-                "output_tokens", 0
-            )
-            return
 
-        # Strategy 2: message.usage_metadata (Anthropic / langchain-anthropic)
-        generations = getattr(response, "generations", [])
-        if generations and generations[0]:
-            msg = getattr(generations[0][0], "message", None)
-            if msg:
-                usage_meta = getattr(msg, "usage_metadata", None)
-                if usage_meta and isinstance(usage_meta, dict):
-                    self.total_input_tokens += usage_meta.get("input_tokens", 0)
-                    self.total_output_tokens += usage_meta.get("output_tokens", 0)
-                    return
-                # Also check response_metadata.usage
-                resp_meta = getattr(msg, "response_metadata", None) or {}
-                resp_usage = resp_meta.get("usage", {})
-                if resp_usage:
-                    self.total_input_tokens += resp_usage.get("input_tokens", 0)
-                    self.total_output_tokens += resp_usage.get("output_tokens", 0)
-                    return
+def create_callbacks(
+    progress_reporter=None, model_id: str = ""
+) -> tuple[list[BaseCallbackHandler], TokenStats]:
+    """Create callback handlers and return (callbacks_list, token_stats).
 
-            # Strategy 3: generation_info (fallback)
-            gen_info = getattr(generations[0][0], "generation_info", {}) or {}
-            gen_usage = gen_info.get("usage", {})
-            if gen_usage:
-                self.total_input_tokens += gen_usage.get("prompt_tokens", 0) or gen_usage.get(
-                    "input_tokens", 0
-                )
-                self.total_output_tokens += gen_usage.get("completion_tokens", 0) or gen_usage.get(
-                    "output_tokens", 0
-                )
+    Uses langchain's built-in UsageMetadataCallbackHandler for token tracking
+    and our AgentStreamingCallback for log groups + tool tracking.
+
+    token_stats provides: input_tokens, output_tokens, total_tokens, llm_calls,
+    tool_calls, estimated_cost.
+    """
+    usage_cb = UsageMetadataCallbackHandler()
+    streaming_cb = AgentStreamingCallback(progress_reporter=progress_reporter)
+
+    stats = TokenStats(usage_cb=usage_cb, streaming_cb=streaming_cb, model_id=model_id)
+    return [usage_cb, streaming_cb], stats
+
+
+class TokenStats:
+    """Aggregates token usage from UsageMetadataCallbackHandler + tool counts."""
+
+    def __init__(
+        self,
+        usage_cb: UsageMetadataCallbackHandler,
+        streaming_cb: AgentStreamingCallback,
+        model_id: str = "",
+    ):
+        self._usage_cb = usage_cb
+        self._streaming_cb = streaming_cb
+        self.model_id = model_id
+
+    @property
+    def input_tokens(self) -> int:
+        return sum(v.get("input_tokens", 0) for v in self._usage_cb.usage_metadata.values())
+
+    @property
+    def output_tokens(self) -> int:
+        return sum(v.get("output_tokens", 0) for v in self._usage_cb.usage_metadata.values())
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+    @property
+    def llm_calls(self) -> int:
+        return sum(
+            v.get("total_tokens", 0) > 0 for v in self._usage_cb.usage_metadata.values()
+        ) or len(self._usage_cb.usage_metadata)
+
+    @property
+    def tool_calls(self) -> int:
+        return self._streaming_cb.tool_call_count
+
+    @property
+    def estimated_cost(self) -> float | None:
+        model = self.model_id
+        if not model:
+            # Use first model from usage_metadata keys
+            keys = list(self._usage_cb.usage_metadata.keys())
+            model = keys[0] if keys else ""
+        return estimate_cost(model, self.input_tokens, self.output_tokens) if model else None
+
+    @property
+    def usage_by_model(self) -> dict:
+        return dict(self._usage_cb.usage_metadata)

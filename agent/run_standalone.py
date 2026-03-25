@@ -138,13 +138,13 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_skill_instruction,
     )
     from agent.observability import (
-        AgentStreamingCallback,
         ProgressReporter,
         build_execution_report,
         gh_group,
         gh_notice,
         write_step_summary,
     )
+    from agent.observability.streaming_callback import create_callbacks
     from agent.utils.model import make_model
 
     _start_time = time.time()
@@ -360,9 +360,9 @@ Use the execute tool for all git operations.
     invoke_config = {"recursion_limit": get_recursion_limit()}
     logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
 
-    # Create streaming callback for tool-level observability
-    streaming_cb = AgentStreamingCallback(progress_reporter=progress)
-    invoke_config["callbacks"] = [streaming_cb]
+    # Create callbacks: langchain UsageMetadataCallbackHandler + our log groups
+    callbacks, token_stats = create_callbacks(progress_reporter=progress, model_id=model_id)
+    invoke_config["callbacks"] = callbacks
 
     progress.start_phase(f"Agent ({skill_id or 'swe-coder'})")
 
@@ -490,10 +490,10 @@ Use the execute tool for all git operations.
 
     # Build execution report first, then finalize progress with it
     progress.update_tokens(
-        input_tokens=streaming_cb.total_input_tokens,
-        output_tokens=streaming_cb.total_output_tokens,
-        llm_calls=streaming_cb.llm_calls,
-        estimated_cost=streaming_cb.estimated_cost,
+        input_tokens=token_stats.input_tokens,
+        output_tokens=token_stats.output_tokens,
+        llm_calls=token_stats.llm_calls,
+        estimated_cost=token_stats.estimated_cost,
     )
 
     execution_report = build_execution_report(
@@ -506,11 +506,11 @@ Use the execute tool for all git operations.
         agent_response=agent_response,
         has_changes=has_changes,
         branch_name=branch_name,
-        input_tokens=streaming_cb.total_input_tokens,
-        output_tokens=streaming_cb.total_output_tokens,
-        llm_calls=streaming_cb.llm_calls,
-        tool_calls=streaming_cb.tool_call_count,
-        estimated_cost=streaming_cb.estimated_cost,
+        input_tokens=token_stats.input_tokens,
+        output_tokens=token_stats.output_tokens,
+        llm_calls=token_stats.llm_calls,
+        tool_calls=token_stats.tool_calls,
+        estimated_cost=token_stats.estimated_cost,
         start_time=_start_time,
     )
 
