@@ -422,9 +422,8 @@ Use the execute tool for all git operations.
         skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}"
     )
 
-    progress.start_phase("Push & PR")
-
     if has_changes:
+        progress.start_phase("Push & PR")
         # Validate push target against org whitelist BEFORE pushing
         allowed_orgs = get_allowed_github_orgs()
         if allowed_orgs and repo_owner.lower() not in allowed_orgs:
@@ -455,14 +454,14 @@ Use the execute tool for all git operations.
                 logger.error("Push failed: %s", push_result.output)
                 has_changes = False
 
-    progress.complete_phase("Push & PR")
+        progress.complete_phase("Push & PR")
 
     # Format sizing reports as rich markdown before output
     if skill_id == "aap-sizing":
         agent_response = _format_sizing_markdown(agent_response)
 
-    # Finalize progress reporter
-    progress.finalize(success=has_changes or not use_default_tools, result=agent_response[:500])
+    # Finalize progress reporter — success means agent ran without crash
+    progress.finalize(success=True, result=agent_response[:500])
 
     # Output results for the workflow
     outputs = {

@@ -8,7 +8,7 @@ from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from .gh_actions import gh_error
+from .gh_actions import _sanitize, gh_error
 
 logger = logging.getLogger("streaming_callback")
 
@@ -36,8 +36,8 @@ class AgentStreamingCallback(BaseCallbackHandler):
         run_id: UUID,
         **kwargs: Any,
     ) -> None:
-        tool_name = serialized.get("name", "unknown_tool")
-        snippet = str(input_str)[:80].replace("\n", " ")
+        tool_name = _sanitize(serialized.get("name", "unknown_tool"))
+        snippet = _sanitize(str(input_str)[:80])
         print(f"::group::Tool: {tool_name} — {snippet}", flush=True)
         self._active_groups[run_id] = tool_name
         self.tool_call_count += 1
@@ -54,7 +54,8 @@ class AgentStreamingCallback(BaseCallbackHandler):
     ) -> None:
         out_str = str(output)
         if len(out_str) > 500:
-            print(f"(output: {len(out_str)} chars)", flush=True)
+            print(out_str[:500], flush=True)
+            print(f"... ({len(out_str)} chars total)", flush=True)
         print("::endgroup::", flush=True)
         self._active_groups.pop(run_id, None)
 
@@ -79,8 +80,11 @@ class AgentStreamingCallback(BaseCallbackHandler):
     ) -> None:
         model_id = serialized.get("id", ["unknown"])
         model_name = model_id[-1] if isinstance(model_id, list) else str(model_id)
-        msg_count = sum(len(batch) for batch in messages)
-        print(f"::group::LLM call — {model_name} ({msg_count} messages)", flush=True)
+        msg_count = sum(len(batch) for batch in messages if isinstance(batch, list))
+        print(
+            f"::group::LLM call — {_sanitize(model_name)} ({msg_count} messages)",
+            flush=True,
+        )
         self._active_groups[run_id] = "llm"
 
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
