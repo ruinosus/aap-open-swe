@@ -1,7 +1,25 @@
 """Build structured execution reports for agent runs."""
 
 import json
+import re
 import time
+
+# Patterns to redact from public output
+_SECRET_PATTERNS = [
+    (r"(sk-[a-zA-Z0-9\-]{20,})", "[REDACTED_KEY]"),
+    (r"(ghp_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
+    (r"(ghs_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
+    (r"(AKIA[0-9A-Z]{16})", "[REDACTED_AWS]"),
+    (r"(Bearer\s+[a-zA-Z0-9\-._~+/]+=*)", "[REDACTED_BEARER]"),
+    (r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}['\"]", r"\1=[REDACTED]"),
+]
+
+
+def _redact_secrets(text: str) -> str:
+    """Redact potential secrets from text before embedding in public comments."""
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = re.sub(pattern, replacement, text)
+    return text
 
 
 def build_execution_report(
@@ -21,6 +39,7 @@ def build_execution_report(
     estimated_cost: float | None,
     start_time: float,
     pr_url: str = "",
+    success: bool = True,
 ) -> str:
     """Build a markdown execution report for the GitHub issue comment.
 
@@ -37,12 +56,12 @@ def build_execution_report(
     cost_str = f"${estimated_cost:.4f}" if estimated_cost is not None else "N/A"
 
     # Status
-    status = (
-        "Success"
-        if has_changes or skill_id in ("code-review", "security-scan", "aap-sizing")
-        else "No changes"
-    )
-    status_icon = "\u2705" if status == "Success" else "\u26a0\ufe0f"
+    if success:
+        status = "Success" if has_changes else "Success (no changes)"
+        status_icon = "\u2705"
+    else:
+        status = "Failed"
+        status_icon = "\u274c"
 
     lines = [
         "## Agent Execution Report",
@@ -82,12 +101,13 @@ def build_execution_report(
         lines.append(f"| **Estimated cost** | **{cost_str}** |")
     lines.append("")
 
-    # Agent output in collapsible details
+    # Agent output in collapsible details (redact potential secrets)
     if agent_response:
+        safe_output = _redact_secrets(agent_response[:5000])
         lines.append("<details>")
         lines.append("<summary>Raw agent output</summary>")
         lines.append("")
-        lines.append(agent_response[:5000])
+        lines.append(safe_output)
         lines.append("")
         lines.append("</details>")
 

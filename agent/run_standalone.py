@@ -170,7 +170,9 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
             with open(github_output, "a") as f:
                 f.write("has_changes=false\n")
                 f.write("branch_name=\n")
-                f.write(f"agent_response<<AGENT_EOF\n{agent_response}\nAGENT_EOF\n")
+                f.write(
+                    f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{agent_response}\nAGENT_RESPONSE_EOF_7f3c9a\n"
+                )
         else:
             print(
                 json.dumps(
@@ -532,7 +534,9 @@ Use the execute tool for all git operations.
         with open(github_output, "a") as f:
             f.write(f"has_changes={'true' if has_changes else 'false'}\n")
             f.write(f"branch_name={branch_name}\n")
-            f.write(f"agent_response<<AGENT_EOF\n{execution_report[:60000]}\nAGENT_EOF\n")
+            f.write(
+                f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{execution_report[:60000]}\nAGENT_RESPONSE_EOF_7f3c9a\n"
+            )
     else:
         print(json.dumps(outputs, indent=2))
 

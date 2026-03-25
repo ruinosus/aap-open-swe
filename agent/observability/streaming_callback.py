@@ -41,6 +41,7 @@ def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> flo
                 pricing = val
                 break
     if not pricing:
+        logger.warning("No pricing found for model '%s' (cleaned: '%s')", model_name, clean_name)
         return None
     return (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
 
