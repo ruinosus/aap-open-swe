@@ -14,12 +14,13 @@ Um **coding agent autonomo** que:
 5. Abre um **Pull Request** automaticamente
 6. Comenta na issue/thread com o resumo
 
-Alem disso, possui **5 skills dinamicas** que ativam automaticamente:
+Alem disso, possui **6 skills dinamicas** que ativam automaticamente:
 - **Code Review** — revisa PRs com inline comments automaticos
 - **Security Scan** — detecta vulnerabilidades (OWASP Top 10, secrets, injection)
 - **Doc Generator** — gera docstrings e documentacao de codigo
 - **Test Generator** — gera testes unitarios para codigo sem cobertura
 - **Project Docs** — atualiza os .md do projeto (README, ARCHITECTURE, etc.)
+- **Respond Review** — responde automaticamente a review comments quando o arquivo foi corrigido
 
 Built on [LangGraph](https://langchain-ai.github.io/langgraph/) + [Deep Agents](https://github.com/langchain-ai/deepagents).
 
@@ -120,7 +121,11 @@ agent/aap_config.py              <- Config layer (manifest -> env var -> default
             |
             ├── SKILL_ID env var -> skill instruction from manifest
             ├── Pydantic schemas -> ProviderStrategy (structured JSON output)
-            └── review_poster.py -> GitHub Reviews API (inline PR comments)
+            ├── review_poster.py -> GitHub Reviews API (inline PR comments)
+            └── agent/observability/
+                    ├── gh_actions.py        <- Log groups + step summary
+                    ├── progress_reporter.py <- Live issue comment updates
+                    └── streaming_callback.py <- LangChain callback (per-tool groups)
     |
 Sandbox (local/cloud)            <- Isolated code execution
 ```
@@ -159,6 +164,18 @@ See `.env.example` for the full list. Key variables:
 - **LangGraph Cloud**: Push to GitHub, connect to LangGraph Cloud, set env vars
 
 See [INSTALLATION.md](INSTALLATION.md) for the full setup guide.
+
+## Observability
+
+Agent execution in GitHub Actions is fully observable via three composable layers:
+
+| Layer | Module | What it does |
+|-------|--------|--------------|
+| A — Log groups | `agent/observability/gh_actions.py` | Wraps each phase in a collapsible `::group::` block; emits `::notice::` / `::warning::` / `::error::` annotations; writes a markdown table to the step summary |
+| B — Live progress | `agent/observability/progress_reporter.py` | Creates (or edits) a GitHub issue comment with a real-time phase bar and tool-call counter |
+| C — Streaming | `agent/observability/streaming_callback.py` | LangChain `BaseCallbackHandler` that opens a log group for every tool call and LLM invocation, and feeds metrics to Layer B |
+
+See [docs/observability.md](docs/observability.md) for full details.
 
 ## Credits
 

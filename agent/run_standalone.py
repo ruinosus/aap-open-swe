@@ -124,7 +124,33 @@ def _format_sizing_markdown(agent_response: str) -> str:
 
 
 async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, issue_number: int):
-    """Run the SWE agent on a task, then commit + open PR + comment."""
+    """Run the SWE agent on a task, then commit, push, and report results.
+
+    Orchestrates the full agent lifecycle:
+
+    1. Handles the ``respond-review`` skill early (no agent needed).
+    2. Initialises a ``ProgressReporter`` for live issue comment updates.
+    3. Loads the model and builds the system prompt from the AAP manifest.
+    4. Assembles the middleware stack (guardrails, repo protection, output
+       validation, ``ensure_no_empty_msg``).
+    5. Creates the Deep Agent and invokes it with an ``AgentStreamingCallback``
+       so every tool call appears as a collapsible log group in GitHub Actions.
+    6. Posts a PR review via the GitHub Reviews API for review-type skills.
+    7. Detects uncommitted / unpushed changes and pushes to the feature branch.
+    8. Writes an execution summary to the GitHub Actions step summary.
+    9. Emits outputs via ``GITHUB_OUTPUT`` for the calling workflow step.
+
+    Args:
+        task: Natural-language task description sent to the agent.
+        repo_dir: Absolute path to the cloned repository on the runner.
+        repo_owner: GitHub organisation or user that owns the target repository.
+        repo_name: Name of the target repository.
+        issue_number: GitHub issue (or PR) number that triggered this run.
+
+    Returns:
+        dict with keys ``has_changes`` (bool), ``branch_name`` (str), and
+        ``agent_response`` (str, truncated to 60 000 chars).
+    """
     from deepagents import create_deep_agent
     from deepagents.backends import LocalShellBackend
 
@@ -524,6 +550,20 @@ Use the execute tool for all git operations.
 
 
 def main():
+    """CLI entry point for the standalone agent runner.
+
+    Reads configuration from environment variables and calls :func:`run_agent`
+    via ``asyncio.run``.
+
+    Required environment variables:
+        TASK: Natural-language task description.
+        REPO_OWNER: GitHub organisation or user.
+        REPO_NAME: Repository name.
+
+    Optional environment variables:
+        REPO_DIR: Path to the cloned repo (defaults to ``os.getcwd()``).
+        ISSUE_NUMBER: GitHub issue number (defaults to ``0``).
+    """
     task = os.environ.get("TASK", "")
     repo_dir = os.environ.get("REPO_DIR", os.getcwd())
     repo_owner = os.environ.get("REPO_OWNER", "")
