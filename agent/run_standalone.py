@@ -183,6 +183,8 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         issue_number=issue_number,
         comment_id=int(os.environ.get("PROGRESS_COMMENT_ID", "0")) or None,
         source_repo=os.environ.get("SOURCE_ISSUE_REPO", f"{repo_owner}/{repo_name}"),
+        skill_id=skill_id,
+        model_id="",  # Set after model loading
     )
 
     with gh_group("Sandbox setup"):
@@ -204,6 +206,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
             max_tokens=get_model_max_tokens(),
         )
         gh_notice(f"Model: {model_id}")
+        progress.model_id = model_id
 
     with gh_group(f"System prompt — {skill_id or 'swe-coder'}"):
         # Build system prompt — skill overrides base if specified
@@ -482,6 +485,13 @@ Use the execute tool for all git operations.
         agent_response = _format_sizing_markdown(agent_response)
 
     # Finalize progress reporter — success means agent ran without crash
+    # Sync token usage from callback to progress reporter before final post
+    progress.update_tokens(
+        input_tokens=streaming_cb.total_input_tokens,
+        output_tokens=streaming_cb.total_output_tokens,
+        llm_calls=streaming_cb.llm_calls,
+        estimated_cost=streaming_cb.estimated_cost,
+    )
     progress.finalize(success=True)
 
     # Output results for the workflow
@@ -502,8 +512,8 @@ Use the execute tool for all git operations.
         print(json.dumps(outputs, indent=2))
 
     # Write GitHub Actions step summary
-    tool_call_count = sum(
-        len(getattr(m, "tool_calls", [])) for m in messages if hasattr(m, "tool_calls")
+    cost_str = (
+        f"${streaming_cb.estimated_cost:.4f}" if streaming_cb.estimated_cost is not None else "N/A"
     )
     summary_lines = [
         "## Agent Execution Summary",
@@ -513,8 +523,12 @@ Use the execute tool for all git operations.
         f"| **Skill** | `{skill_id or 'swe-coder'}` |",
         f"| **Model** | `{model_id}` |",
         f"| **Repo** | `{repo_owner}/{repo_name}` |",
-        f"| **Messages** | {len(messages)} |",
-        f"| **Tool calls** | {tool_call_count} |",
+        f"| **LLM calls** | {streaming_cb.llm_calls} |",
+        f"| **Input tokens** | {streaming_cb.total_input_tokens:,} |",
+        f"| **Output tokens** | {streaming_cb.total_output_tokens:,} |",
+        f"| **Total tokens** | {streaming_cb.total_tokens:,} |",
+        f"| **Tool calls** | {streaming_cb.tool_call_count} |",
+        f"| **Estimated cost** | {cost_str} |",
         f"| **Has changes** | {'Yes' if has_changes else 'No'} |",
         f"| **Branch** | `{branch_name}` |",
     ]
