@@ -71,7 +71,7 @@ jobs:
             const task = body.replace(/@aap-open-swe/gi, '').trim();
 
             // Detect skill commands
-            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs|sizing|migrate)\b/i);
+            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs|sizing|migrate|respond-review)\b/i);
             const skillMap = {
               'review': 'code-review',
               'security': 'security-scan',
@@ -80,6 +80,7 @@ jobs:
               'project-docs': 'project-docs',
               'sizing': 'aap-sizing',
               'migrate': 'migrate-to-aap',
+              'respond-review': 'respond-review',
             };
             const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
             core.setOutput('skill_id', skillId);
@@ -679,7 +680,7 @@ jobs:
             const task = body.replace(/@aap-open-swe/gi, '').trim();
 
             // Detect skill commands
-            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs|sizing|migrate)\b/i);
+            const skillMatch = body.match(/@aap-open-swe\s+(review|security|docs|tests|project-docs|sizing|migrate|respond-review)\b/i);
             const skillMap = {
               'review': 'code-review',
               'security': 'security-scan',
@@ -688,6 +689,7 @@ jobs:
               'project-docs': 'project-docs',
               'sizing': 'aap-sizing',
               'migrate': 'migrate-to-aap',
+              'respond-review': 'respond-review',
             };
             const skillId = skillMatch ? skillMap[skillMatch[1].toLowerCase()] || '' : '';
             core.setOutput('skill_id', skillId);

@@ -164,11 +164,30 @@ def post_pr_review(
     try:
         resp = httpx.post(api_url, headers=headers, json=payload, timeout=30)
         if resp.status_code in (200, 201):
-            logger.info("Posted PR review with %d comments", len(review_comments))
+            logger.info("Posted PR review with %d inline comments", len(review_comments))
             return True
-        else:
-            logger.error("Failed to post PR review: %s %s", resp.status_code, resp.text[:200])
+
+        # 422 "Line could not be resolved" — inline comments reference lines
+        # not in the current diff (e.g., after a fix commit). Retry without
+        # inline comments, posting the summary + findings as a single comment.
+        if resp.status_code == 422 and review_comments:
+            logger.warning("Inline comments failed (422), retrying as summary-only review")
+            # Build findings table as part of the body
+            findings_md = "\n".join(
+                f"- **[{c.get('severity', 'info').upper()}]** `{c['file']}:{c.get('line', '?')}` — {c['message']}"
+                for c in comments
+            )
+            fallback_body = body + f"\n\n{findings_md}"
+            fallback_payload = {"body": fallback_body, "event": "COMMENT", "comments": []}
+            resp2 = httpx.post(api_url, headers=headers, json=fallback_payload, timeout=30)
+            if resp2.status_code in (200, 201):
+                logger.info("Posted PR review as summary-only (no inline comments)")
+                return True
+            logger.error("Fallback review also failed: %s %s", resp2.status_code, resp2.text[:200])
             return False
+
+        logger.error("Failed to post PR review: %s %s", resp.status_code, resp.text[:200])
+        return False
     except Exception:
         logger.exception("Failed to post PR review")
         return False

@@ -150,6 +150,31 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         logger.error("GITHUB_TOKEN not set")
         sys.exit(1)
 
+    # Handle respond-review skill — no agent needed, just reply to PR comments
+    skill_id = os.environ.get("SKILL_ID", "")
+    pr_number = int(os.environ.get("PR_NUMBER", "0"))
+    if skill_id == "respond-review" and pr_number:
+        from agent.review_responder import respond_to_review
+
+        logger.info("Responding to review comments on PR #%d", pr_number)
+        stats = respond_to_review(repo_owner, repo_name, pr_number, github_token, repo_dir)
+        logger.info("Review response stats: %s", json.dumps(stats))
+        agent_response = f"Responded to {stats.get('replied', 0)} review comments ({stats.get('skipped', 0)} skipped, {stats.get('already_replied', 0)} already replied)."
+
+        github_output = os.environ.get("GITHUB_OUTPUT", "")
+        if github_output:
+            with open(github_output, "a") as f:
+                f.write("has_changes=false\n")
+                f.write("branch_name=\n")
+                f.write(f"agent_response<<AGENT_EOF\n{agent_response}\nAGENT_EOF\n")
+        else:
+            print(
+                json.dumps(
+                    {"has_changes": False, "branch_name": "", "agent_response": agent_response}
+                )
+            )
+        return {"has_changes": False, "branch_name": "", "agent_response": agent_response}
+
     # Initialize progress reporter for live issue comment updates
     progress = ProgressReporter(
         github_token=github_token,
@@ -179,10 +204,6 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
             max_tokens=get_model_max_tokens(),
         )
         gh_notice(f"Model: {model_id}")
-
-    # Check for skill-specific execution
-    skill_id = os.environ.get("SKILL_ID", "")
-    pr_number = int(os.environ.get("PR_NUMBER", "0"))
 
     with gh_group(f"System prompt — {skill_id or 'swe-coder'}"):
         # Build system prompt — skill overrides base if specified
