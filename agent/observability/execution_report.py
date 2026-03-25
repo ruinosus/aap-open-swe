@@ -141,6 +141,7 @@ def _extract_summary(
             comments = data.get("comments", [])
             score = data.get("score", "N/A")
             summary = data.get("summary", "")
+            guardrails = data.get("suggested_guardrails", [])
             severities = {}
             for c in comments:
                 sev = c.get("severity", "info")
@@ -153,6 +154,15 @@ def _extract_summary(
                 else "- No findings",
                 f"- {summary}" if summary else "",
             ]
+            if guardrails:
+                lines.append("")
+                lines.append(f"**Suggested guardrails** ({len(guardrails)}):")
+                for g in guardrails:
+                    name = g.get("name", "unknown")
+                    desc = g.get("description", "")
+                    phase = g.get("phase", "input")
+                    action = g.get("action", "block")
+                    lines.append(f"- `{name}` — {desc} ({phase}/{action})")
             return "\n".join(line for line in lines if line)
 
         if output_type == "sizing":
