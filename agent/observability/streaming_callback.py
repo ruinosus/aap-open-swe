@@ -31,11 +31,15 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
 
 def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> float | None:
     """Estimate cost in USD based on model pricing. Returns None if unknown."""
-    # Try exact match, then prefix match
-    pricing = MODEL_PRICING.get(model_name)
+    # Strip provider prefix (e.g., "anthropic:claude-sonnet-4-6" -> "claude-sonnet-4-6")
+    clean_name = model_name.split(":")[-1] if ":" in model_name else model_name
+
+    # Try exact match
+    pricing = MODEL_PRICING.get(clean_name)
     if not pricing:
+        # Try substring match
         for key, val in MODEL_PRICING.items():
-            if key in model_name or model_name in key:
+            if key in clean_name or clean_name in key:
                 pricing = val
                 break
     if not pricing:
@@ -133,28 +137,7 @@ class AgentStreamingCallback(BaseCallbackHandler):
 
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self.llm_calls += 1
-
-        # Extract token usage from LLMResult
-        llm_output = getattr(response, "llm_output", None) or {}
-        usage = llm_output.get("token_usage") or llm_output.get("usage") or {}
-        if usage:
-            self.total_input_tokens += usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
-            self.total_output_tokens += usage.get("completion_tokens", 0) or usage.get(
-                "output_tokens", 0
-            )
-        else:
-            # Fallback: check generation_info
-            generations = getattr(response, "generations", [])
-            if generations and generations[0]:
-                gen_info = getattr(generations[0][0], "generation_info", {}) or {}
-                gen_usage = gen_info.get("usage", {})
-                if gen_usage:
-                    self.total_input_tokens += gen_usage.get("prompt_tokens", 0) or gen_usage.get(
-                        "input_tokens", 0
-                    )
-                    self.total_output_tokens += gen_usage.get(
-                        "completion_tokens", 0
-                    ) or gen_usage.get("output_tokens", 0)
+        self._extract_token_usage(response)
 
         if run_id in self._active_groups:
             print("::endgroup::", flush=True)
@@ -165,3 +148,44 @@ class AgentStreamingCallback(BaseCallbackHandler):
         if run_id in self._active_groups:
             print("::endgroup::", flush=True)
             self._active_groups.pop(run_id, None)
+
+    def _extract_token_usage(self, response: Any) -> None:
+        """Extract token usage from LLMResult — supports OpenAI and Anthropic."""
+        # Strategy 1: llm_output.token_usage (OpenAI pattern)
+        llm_output = getattr(response, "llm_output", None) or {}
+        usage = llm_output.get("token_usage") or llm_output.get("usage") or {}
+        if usage:
+            self.total_input_tokens += usage.get("prompt_tokens", 0) or usage.get("input_tokens", 0)
+            self.total_output_tokens += usage.get("completion_tokens", 0) or usage.get(
+                "output_tokens", 0
+            )
+            return
+
+        # Strategy 2: message.usage_metadata (Anthropic / langchain-anthropic)
+        generations = getattr(response, "generations", [])
+        if generations and generations[0]:
+            msg = getattr(generations[0][0], "message", None)
+            if msg:
+                usage_meta = getattr(msg, "usage_metadata", None)
+                if usage_meta and isinstance(usage_meta, dict):
+                    self.total_input_tokens += usage_meta.get("input_tokens", 0)
+                    self.total_output_tokens += usage_meta.get("output_tokens", 0)
+                    return
+                # Also check response_metadata.usage
+                resp_meta = getattr(msg, "response_metadata", None) or {}
+                resp_usage = resp_meta.get("usage", {})
+                if resp_usage:
+                    self.total_input_tokens += resp_usage.get("input_tokens", 0)
+                    self.total_output_tokens += resp_usage.get("output_tokens", 0)
+                    return
+
+            # Strategy 3: generation_info (fallback)
+            gen_info = getattr(generations[0][0], "generation_info", {}) or {}
+            gen_usage = gen_info.get("usage", {})
+            if gen_usage:
+                self.total_input_tokens += gen_usage.get("prompt_tokens", 0) or gen_usage.get(
+                    "input_tokens", 0
+                )
+                self.total_output_tokens += gen_usage.get("completion_tokens", 0) or gen_usage.get(
+                    "output_tokens", 0
+                )

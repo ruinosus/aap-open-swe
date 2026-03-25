@@ -488,17 +488,14 @@ Use the execute tool for all git operations.
     if skill_id == "aap-sizing":
         agent_response = _format_sizing_markdown(agent_response)
 
-    # Finalize progress reporter — success means agent ran without crash
-    # Sync token usage from callback to progress reporter before final post
+    # Build execution report first, then finalize progress with it
     progress.update_tokens(
         input_tokens=streaming_cb.total_input_tokens,
         output_tokens=streaming_cb.total_output_tokens,
         llm_calls=streaming_cb.llm_calls,
         estimated_cost=streaming_cb.estimated_cost,
     )
-    progress.finalize(success=True)
 
-    # Build execution report
     execution_report = build_execution_report(
         skill_id=skill_id or "swe-coder",
         model_id=model_id,
@@ -516,6 +513,9 @@ Use the execute tool for all git operations.
         estimated_cost=streaming_cb.estimated_cost,
         start_time=_start_time,
     )
+
+    # Finalize progress — replace progress comment with execution report
+    progress.finalize(success=True, execution_report=execution_report)
 
     # Output results for the workflow
     outputs = {

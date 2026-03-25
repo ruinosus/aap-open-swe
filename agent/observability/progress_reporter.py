@@ -89,12 +89,15 @@ class ProgressReporter:
         self.llm_calls = llm_calls
         self.estimated_cost = estimated_cost
 
-    def finalize(self, success: bool = True) -> None:
-        """Final update — mark all running phases done or failed."""
+    def finalize(self, success: bool = True, execution_report: str = "") -> None:
+        """Final update — replace progress comment with execution report."""
         for p in self._phases:
             if p["status"] == "running":
                 p["status"] = "done" if success else "failed"
-        self._post(final=True)
+        if execution_report:
+            self._post_body(execution_report)
+        else:
+            self._post(final=True)
 
     def _format_progress(self, final: bool = False) -> str:
         """Build the markdown progress comment."""
@@ -148,6 +151,29 @@ class ProgressReporter:
                 lines.append(f"| **Estimated cost** | **${self.estimated_cost:.4f}** |")
 
         return "\n".join(lines)
+
+    def _post_body(self, body: str) -> None:
+        """Post or edit a comment with the given body text."""
+        if not self.enabled:
+            return
+        headers = {
+            "Authorization": f"token {self.github_token}",
+            "Accept": "application/vnd.github+json",
+        }
+        if "/" not in self.source_repo:
+            return
+        source_owner, source_name = self.source_repo.split("/", 1)
+        try:
+            if self.comment_id:
+                url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/comments/{self.comment_id}"
+                requests.patch(url, headers=headers, json={"body": body}, timeout=10)
+            else:
+                url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/{self.issue_number}/comments"
+                resp = requests.post(url, headers=headers, json={"body": body}, timeout=10)
+                if resp.ok:
+                    self.comment_id = resp.json().get("id")
+        except Exception:
+            logger.debug("Failed to post body", exc_info=True)
 
     def _post(self, final: bool = False) -> None:
         """Create or edit the progress comment on GitHub."""
