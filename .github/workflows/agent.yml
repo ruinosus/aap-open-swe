@@ -254,26 +254,12 @@ jobs:
         if: always() && steps.agent.outcome == 'success'
         env:
           AGENT_RESPONSE: ${{ steps.agent.outputs.agent_response }}
-          SKILL_ID: ${{ steps.extract.outputs.skill_id }}
         uses: actions/github-script@v7
         with:
           script: |
             const issueNumber = ${{ steps.extract.outputs.issue_number }};
-            const hasChanges = '${{ steps.agent.outputs.has_changes }}' === 'true';
-            const prUrl = '${{ steps.create-pr.outputs.pr_url }}' || '';
-            const agentResponse = (process.env.AGENT_RESPONSE || '').slice(0, 5000);
-            const skillId = process.env.SKILL_ID || '';
-
-            let comment;
-
-            // Sizing reports are pre-formatted as markdown by run_standalone.py
-            if (skillId === 'aap-sizing') {
-              comment = agentResponse.startsWith('##') ? agentResponse : `### AAP Open SWE Agent — Sizing\n\n${agentResponse}`;
-            } else if (hasChanges && prUrl) {
-              comment = `### AAP Open SWE Agent\n\nI've analyzed the issue and opened a draft PR with the fix:\n${prUrl}\n\n<details>\n<summary>Agent output</summary>\n\n${agentResponse}\n\n</details>`;
-            } else {
-              comment = `### AAP Open SWE Agent\n\n${agentResponse || 'I analyzed the issue but no code changes were needed.'}`;
-            }
+            // agent_response is now a full execution report (markdown)
+            const comment = (process.env.AGENT_RESPONSE || 'Agent completed but produced no output.').slice(0, 60000);
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -791,6 +777,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
           SANDBOX_TYPE: local
+          SOURCE_ISSUE_REPO: ${{ github.repository }}
         run: |
           source .venv/bin/activate
           PYTHONPATH=. python agent/run_standalone.py
@@ -809,6 +796,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPEN_SWE_MODEL: ${{ vars.OPEN_SWE_MODEL || 'anthropic:claude-sonnet-4-6' }}
           SANDBOX_TYPE: local
+          SOURCE_ISSUE_REPO: ${{ github.repository }}
         run: |
           source .venv/bin/activate
           PYTHONPATH=. python agent/run_standalone.py

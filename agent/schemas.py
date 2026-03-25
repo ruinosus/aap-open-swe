@@ -29,6 +29,20 @@ class ReviewComment(_StrictSchema):
     severity: str = Field(description="One of: critical, high, medium, low")
 
 
+class GuardrailSuggestion(_StrictSchema):
+    """A suggested AAP SDK guardrail manifest for a security finding."""
+
+    name: str = Field(description="Guardrail name in kebab-case (e.g., 'sql-injection-block')")
+    description: str = Field(description="What this guardrail prevents")
+    phase: str = Field(description="'input' or 'output'")
+    pattern: str = Field(description="Regex pattern to detect the vulnerability")
+    action: str = Field(description="'block' or 'rewrite'")
+    finding_ids: list[int] = Field(
+        default_factory=list,
+        description="Indices of comments[] this guardrail would prevent (0-based)",
+    )
+
+
 class ReviewOutput(_StrictSchema):
     """Structured output for code-review and security-scan skills."""
 
@@ -41,6 +55,10 @@ class ReviewOutput(_StrictSchema):
     comments: list[ReviewComment] = Field(
         default_factory=list,
         description="List of findings with file, line, message, and severity",
+    )
+    suggested_guardrails: list[GuardrailSuggestion] = Field(
+        default_factory=list,
+        description="Suggested AAP SDK guardrail manifests for critical/high findings (security-scan only)",
     )
 
 

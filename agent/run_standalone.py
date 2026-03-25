@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sys
+import time
 
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
 logger = logging.getLogger("run_standalone")
@@ -137,13 +138,16 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_skill_instruction,
     )
     from agent.observability import (
-        AgentStreamingCallback,
         ProgressReporter,
+        build_execution_report,
         gh_group,
         gh_notice,
         write_step_summary,
     )
+    from agent.observability.streaming_callback import create_callbacks
     from agent.utils.model import make_model
+
+    _start_time = time.time()
 
     github_token = os.environ.get("GITHUB_TOKEN", "")
     if not github_token:
@@ -166,7 +170,9 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
             with open(github_output, "a") as f:
                 f.write("has_changes=false\n")
                 f.write("branch_name=\n")
-                f.write(f"agent_response<<AGENT_EOF\n{agent_response}\nAGENT_EOF\n")
+                f.write(
+                    f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{agent_response}\nAGENT_RESPONSE_EOF_7f3c9a\n"
+                )
         else:
             print(
                 json.dumps(
@@ -183,6 +189,8 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         issue_number=issue_number,
         comment_id=int(os.environ.get("PROGRESS_COMMENT_ID", "0")) or None,
         source_repo=os.environ.get("SOURCE_ISSUE_REPO", f"{repo_owner}/{repo_name}"),
+        skill_id=skill_id,
+        model_id="",  # Set after model loading
     )
 
     with gh_group("Sandbox setup"):
@@ -204,6 +212,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
             max_tokens=get_model_max_tokens(),
         )
         gh_notice(f"Model: {model_id}")
+        progress.model_id = model_id
 
     with gh_group(f"System prompt — {skill_id or 'swe-coder'}"):
         # Build system prompt — skill overrides base if specified
@@ -353,9 +362,9 @@ Use the execute tool for all git operations.
     invoke_config = {"recursion_limit": get_recursion_limit()}
     logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
 
-    # Create streaming callback for tool-level observability
-    streaming_cb = AgentStreamingCallback(progress_reporter=progress)
-    invoke_config["callbacks"] = [streaming_cb]
+    # Create callbacks: langchain UsageMetadataCallbackHandler + our log groups
+    callbacks, token_stats = create_callbacks(progress_reporter=progress, model_id=model_id)
+    invoke_config["callbacks"] = callbacks
 
     progress.start_phase(f"Agent ({skill_id or 'swe-coder'})")
 
@@ -481,14 +490,43 @@ Use the execute tool for all git operations.
     if skill_id == "aap-sizing":
         agent_response = _format_sizing_markdown(agent_response)
 
-    # Finalize progress reporter — success means agent ran without crash
-    progress.finalize(success=True)
+    # Build execution report first, then finalize progress with it
+    progress.update_tokens(
+        input_tokens=token_stats.input_tokens,
+        output_tokens=token_stats.output_tokens,
+        llm_calls=token_stats.llm_calls,
+        estimated_cost=token_stats.estimated_cost,
+    )
+
+    execution_report = build_execution_report(
+        skill_id=skill_id or "swe-coder",
+        model_id=model_id,
+        repo_owner=repo_owner,
+        repo_name=repo_name,
+        issue_number=issue_number,
+        task=task,
+        agent_response=agent_response,
+        has_changes=has_changes,
+        branch_name=branch_name,
+        input_tokens=token_stats.input_tokens,
+        output_tokens=token_stats.output_tokens,
+        llm_calls=token_stats.llm_calls,
+        tool_calls=token_stats.tool_calls,
+        estimated_cost=token_stats.estimated_cost,
+        start_time=_start_time,
+    )
+
+    # Finalize progress — replace progress comment with execution report
+    progress.finalize(success=True, execution_report=execution_report)
 
     # Output results for the workflow
+    # agent_response keeps the raw output for downstream JSON parsing
+    # execution_report is the formatted markdown for issue comments
     outputs = {
         "has_changes": has_changes,
         "branch_name": branch_name if has_changes else "",
-        "agent_response": agent_response[:60000],  # GitHub has limits
+        "agent_response": execution_report[:60000],
+        "agent_response_raw": agent_response[:60000],
     }
 
     github_output = os.environ.get("GITHUB_OUTPUT", "")
@@ -496,29 +534,14 @@ Use the execute tool for all git operations.
         with open(github_output, "a") as f:
             f.write(f"has_changes={'true' if has_changes else 'false'}\n")
             f.write(f"branch_name={branch_name}\n")
-            # Multi-line output
-            f.write(f"agent_response<<AGENT_EOF\n{agent_response[:60000]}\nAGENT_EOF\n")
+            f.write(
+                f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{execution_report[:60000]}\nAGENT_RESPONSE_EOF_7f3c9a\n"
+            )
     else:
         print(json.dumps(outputs, indent=2))
 
-    # Write GitHub Actions step summary
-    tool_call_count = sum(
-        len(getattr(m, "tool_calls", [])) for m in messages if hasattr(m, "tool_calls")
-    )
-    summary_lines = [
-        "## Agent Execution Summary",
-        "",
-        "| Key | Value |",
-        "|-----|-------|",
-        f"| **Skill** | `{skill_id or 'swe-coder'}` |",
-        f"| **Model** | `{model_id}` |",
-        f"| **Repo** | `{repo_owner}/{repo_name}` |",
-        f"| **Messages** | {len(messages)} |",
-        f"| **Tool calls** | {tool_call_count} |",
-        f"| **Has changes** | {'Yes' if has_changes else 'No'} |",
-        f"| **Branch** | `{branch_name}` |",
-    ]
-    write_step_summary("\n".join(summary_lines))
+    # Write GitHub Actions step summary (same report)
+    write_step_summary(execution_report)
 
     return outputs
 
