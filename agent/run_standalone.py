@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sys
+import time
 
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
 logger = logging.getLogger("run_standalone")
@@ -139,11 +140,14 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     from agent.observability import (
         AgentStreamingCallback,
         ProgressReporter,
+        build_execution_report,
         gh_group,
         gh_notice,
         write_step_summary,
     )
     from agent.utils.model import make_model
+
+    _start_time = time.time()
 
     github_token = os.environ.get("GITHUB_TOKEN", "")
     if not github_token:
@@ -494,11 +498,30 @@ Use the execute tool for all git operations.
     )
     progress.finalize(success=True)
 
+    # Build execution report
+    execution_report = build_execution_report(
+        skill_id=skill_id or "swe-coder",
+        model_id=model_id,
+        repo_owner=repo_owner,
+        repo_name=repo_name,
+        issue_number=issue_number,
+        task=task,
+        agent_response=agent_response,
+        has_changes=has_changes,
+        branch_name=branch_name,
+        input_tokens=streaming_cb.total_input_tokens,
+        output_tokens=streaming_cb.total_output_tokens,
+        llm_calls=streaming_cb.llm_calls,
+        tool_calls=streaming_cb.tool_call_count,
+        estimated_cost=streaming_cb.estimated_cost,
+        start_time=_start_time,
+    )
+
     # Output results for the workflow
     outputs = {
         "has_changes": has_changes,
         "branch_name": branch_name if has_changes else "",
-        "agent_response": agent_response[:60000],  # GitHub has limits
+        "agent_response": execution_report[:60000],
     }
 
     github_output = os.environ.get("GITHUB_OUTPUT", "")
@@ -506,33 +529,12 @@ Use the execute tool for all git operations.
         with open(github_output, "a") as f:
             f.write(f"has_changes={'true' if has_changes else 'false'}\n")
             f.write(f"branch_name={branch_name}\n")
-            # Multi-line output
-            f.write(f"agent_response<<AGENT_EOF\n{agent_response[:60000]}\nAGENT_EOF\n")
+            f.write(f"agent_response<<AGENT_EOF\n{execution_report[:60000]}\nAGENT_EOF\n")
     else:
         print(json.dumps(outputs, indent=2))
 
-    # Write GitHub Actions step summary
-    cost_str = (
-        f"${streaming_cb.estimated_cost:.4f}" if streaming_cb.estimated_cost is not None else "N/A"
-    )
-    summary_lines = [
-        "## Agent Execution Summary",
-        "",
-        "| Key | Value |",
-        "|-----|-------|",
-        f"| **Skill** | `{skill_id or 'swe-coder'}` |",
-        f"| **Model** | `{model_id}` |",
-        f"| **Repo** | `{repo_owner}/{repo_name}` |",
-        f"| **LLM calls** | {streaming_cb.llm_calls} |",
-        f"| **Input tokens** | {streaming_cb.total_input_tokens:,} |",
-        f"| **Output tokens** | {streaming_cb.total_output_tokens:,} |",
-        f"| **Total tokens** | {streaming_cb.total_tokens:,} |",
-        f"| **Tool calls** | {streaming_cb.tool_call_count} |",
-        f"| **Estimated cost** | {cost_str} |",
-        f"| **Has changes** | {'Yes' if has_changes else 'No'} |",
-        f"| **Branch** | `{branch_name}` |",
-    ]
-    write_step_summary("\n".join(summary_lines))
+    # Write GitHub Actions step summary (same report)
+    write_step_summary(execution_report)
 
     return outputs
 
