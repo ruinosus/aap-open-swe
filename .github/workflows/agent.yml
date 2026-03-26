@@ -200,7 +200,7 @@ jobs:
           PROGRESS_COMMENT_ID: ${{ steps.extract.outputs.comment_id }}
         run: |
           source .venv/bin/activate
-          PYTHONPATH=${{ github.workspace }} python agent/run_standalone.py
+          PYTHONPATH=${{ github.workspace }} python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -335,7 +335,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -446,7 +446,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -557,7 +557,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -702,7 +702,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Push changes to PR branch
         if: steps.agent.outputs.has_changes == 'true'
@@ -780,7 +780,7 @@ jobs:
           SOURCE_ISSUE_REPO: ${{ github.repository }}
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Run security scan
         env:
@@ -799,7 +799,7 @@ jobs:
           SOURCE_ISSUE_REPO: ${{ github.repository }}
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
   # ─── Trigger 7: PR merged to main → doc-generator ──
   run-doc-gen:
@@ -849,7 +849,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'
@@ -927,7 +927,7 @@ jobs:
           SANDBOX_TYPE: local
         run: |
           source .venv/bin/activate
-          PYTHONPATH=. python agent/run_standalone.py
+          PYTHONPATH=. python -m agent.runner.standalone
 
       - name: Create Pull Request
         if: steps.agent.outputs.has_changes == 'true'

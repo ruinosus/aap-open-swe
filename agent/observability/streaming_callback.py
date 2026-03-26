@@ -6,44 +6,64 @@ import logging
 from typing import Any
 from uuid import UUID
 
+import requests as _requests
 from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 
 from .gh_actions import _sanitize, gh_error
 
 logger = logging.getLogger("streaming_callback")
 
-# Pricing per 1M tokens (USD) — source: github.com/anomalyco/models.dev
-MODEL_PRICING: dict[str, dict[str, float]] = {
-    # Anthropic
-    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
-    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
-    "claude-opus-4-6": {"input": 5.00, "output": 25.00},
-    "claude-opus-4-20250514": {"input": 15.00, "output": 75.00},
-    "claude-haiku-4-5": {"input": 1.00, "output": 5.00},
-    "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.00},
-    # OpenAI
-    "gpt-4o": {"input": 2.50, "output": 10.00},
-    "gpt-4o-2024-11-20": {"input": 2.50, "output": 10.00},
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    "gpt-4o-mini-2024-07-18": {"input": 0.15, "output": 0.60},
-}
+# Live pricing from models.dev — fetched once, cached for the process lifetime
+_MODELS_DEV_URL = "https://models.dev/api.json"
+_pricing_cache: dict | None = None
+
+
+def _get_pricing_data() -> dict:
+    """Fetch and cache pricing data from models.dev."""
+    global _pricing_cache
+    if _pricing_cache is not None:
+        return _pricing_cache
+    try:
+        resp = _requests.get(_MODELS_DEV_URL, timeout=5)
+        if resp.ok:
+            _pricing_cache = resp.json()
+            logger.info("Loaded pricing data from models.dev (%d providers)", len(_pricing_cache))
+        else:
+            logger.warning("models.dev returned %s, using empty pricing", resp.status_code)
+            _pricing_cache = {}
+    except Exception:
+        logger.warning("Failed to fetch models.dev pricing, cost tracking unavailable")
+        _pricing_cache = {}
+    return _pricing_cache
 
 
 def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> float | None:
-    """Estimate cost in USD based on model pricing. Returns None if unknown."""
-    # Strip provider prefix (e.g., "anthropic:claude-sonnet-4-6" -> "claude-sonnet-4-6")
-    clean_name = model_name.split(":")[-1] if ":" in model_name else model_name
+    """Estimate cost in USD using live pricing from models.dev."""
+    # Parse provider:model format (e.g., "anthropic:claude-sonnet-4-6")
+    if ":" in model_name:
+        provider, model_id = model_name.split(":", 1)
+    else:
+        # Guess provider from model name
+        model_id = model_name
+        if model_name.startswith(("claude", "claude-")):
+            provider = "anthropic"
+        elif model_name.startswith(("gpt-", "o1", "o3", "o4")):
+            provider = "openai"
+        else:
+            provider = ""
 
-    pricing = MODEL_PRICING.get(clean_name)
-    if not pricing:
-        for key, val in MODEL_PRICING.items():
-            if clean_name.startswith(key) or key.startswith(clean_name):
-                pricing = val
-                break
-    if not pricing:
-        logger.warning("No pricing found for model '%s' (cleaned: '%s')", model_name, clean_name)
+    data = _get_pricing_data()
+    cost = data.get(provider, {}).get("models", {}).get(model_id, {}).get("cost")
+
+    if not cost:
+        logger.warning(
+            "No pricing for '%s' (provider=%s, model=%s)", model_name, provider, model_id
+        )
         return None
-    return (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
+
+    input_price = cost.get("input", 0)
+    output_price = cost.get("output", 0)
+    return (input_tokens * input_price + output_tokens * output_price) / 1_000_000
 
 
 class AgentStreamingCallback(BaseCallbackHandler):
