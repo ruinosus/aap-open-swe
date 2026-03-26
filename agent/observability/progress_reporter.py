@@ -70,8 +70,10 @@ class ProgressReporter:
 
     def log_tool_call(self, tool_name: str, snippet: str = "") -> None:
         """Log a tool call (increments counter)."""
+        from agent.config import get_tool_call_log_frequency
+
         self._tool_calls += 1
-        if self._tool_calls % 5 == 0:
+        if self._tool_calls % get_tool_call_log_frequency() == 0:
             self._post()
 
     def update_tokens(
@@ -120,7 +122,7 @@ class ProgressReporter:
                     "done": "success",
                     "failed": "failure",
                 }.get(p["status"], "pending"),
-                "\u2b1c",
+                fmt.get("miscIcons", {}).get("pending", "") if isinstance(fmt, dict) else "",
             )
             bar_parts.append(f"{icon} {p['name']}")
 
@@ -146,6 +148,8 @@ class ProgressReporter:
 
     def _post_body(self, body: str) -> None:
         """Post or edit a comment with the given body text."""
+        from agent.config import get_http_timeout
+
         if not self.enabled:
             return
         headers = {
@@ -156,15 +160,16 @@ class ProgressReporter:
             logger.debug("Invalid source_repo for _post_body: %s", self.source_repo)
             return
         source_owner, source_name = self.source_repo.split("/", 1)
+        _timeout = get_http_timeout()
         try:
             if self.comment_id:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/comments/{self.comment_id}"
-                resp = requests.patch(url, headers=headers, json={"body": body}, timeout=10)
+                resp = requests.patch(url, headers=headers, json={"body": body}, timeout=_timeout)
                 if not resp.ok:
                     logger.debug("_post_body PATCH failed: %s", resp.status_code)
             else:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/{self.issue_number}/comments"
-                resp = requests.post(url, headers=headers, json={"body": body}, timeout=10)
+                resp = requests.post(url, headers=headers, json={"body": body}, timeout=_timeout)
                 if resp.ok:
                     self.comment_id = resp.json().get("id")
                 else:
@@ -174,6 +179,8 @@ class ProgressReporter:
 
     def _post(self, final: bool = False) -> None:
         """Create or edit the progress comment on GitHub."""
+        from agent.config import get_http_timeout
+
         if not self.enabled:
             return
 
@@ -188,15 +195,16 @@ class ProgressReporter:
             return
         source_owner, source_name = self.source_repo.split("/", 1)
 
+        _timeout = get_http_timeout()
         try:
             if self.comment_id:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/comments/{self.comment_id}"
-                resp = requests.patch(url, headers=headers, json={"body": body}, timeout=10)
+                resp = requests.patch(url, headers=headers, json={"body": body}, timeout=_timeout)
                 if not resp.ok:
                     logger.debug("PATCH failed: %s", resp.status_code)
             else:
                 url = f"https://api.github.com/repos/{source_owner}/{source_name}/issues/{self.issue_number}/comments"
-                resp = requests.post(url, headers=headers, json={"body": body}, timeout=10)
+                resp = requests.post(url, headers=headers, json={"body": body}, timeout=_timeout)
                 if resp.ok:
                     self.comment_id = resp.json().get("id")
                 else:

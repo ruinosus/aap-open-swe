@@ -167,6 +167,18 @@ spec:
       4: "\U0001f6e1\ufe0f"
       5: "\u2728"
       6: "\U0001f4bb"
+    miscIcons:
+      clipboard: "\U0001f4cb"
+      folder: "\U0001f4c1"
+      chart: "\U0001f4ca"
+      external: "\U0001f500"
+      internal: "\U0001f3e0"
+      package: "\U0001f4e6"
+      warning: "\u26a0\ufe0f"
+      neutral: "\u26aa"
+    repoTypeLabels:
+      external: "\U0001f500 External (fork required)"
+      internal: "\U0001f3e0 Internal"
 
   # ─── Report Templates ───────────────────────────────────
   templates:
@@ -252,6 +264,57 @@ spec:
     - key: open-swe.skills.respond-review.branchPattern
       category: skills
       defaultValue: ''
+
+    # Agent prompt templates (inline content, read via artifact_value)
+    - key: open-swe.prompts.fallback
+      category: prompts
+      defaultValue: "You are a coding assistant. Your working directory is {working_dir}. Use the execute tool to run commands. Be concise and focused."
+    - key: open-swe.prompts.runner_context
+      category: prompts
+      defaultValue: "\n\n---\n\n### GitHub Actions Context\n\nYou are running inside a GitHub Actions workflow on repository {repo_owner}/{repo_name}.\nIssue/PR number: #{issue_number}\n\nWhen you are done with your changes:\n1. Run linters/formatters if available\n2. Stage and commit your changes with a descriptive message\n3. Push to a new branch named `{branch_pattern}`\n4. The workflow will handle creating the PR and commenting on the issue.\n\nDo NOT call commit_and_open_pr or github_comment tools — they are not available here.\nUse the execute tool for all git operations."
+
+    # Agent defaults
+    - key: open-swe.config.default_agent_id
+      category: configuration
+      defaultValue: swe-coder
+    - key: open-swe.config.default_bot_login
+      category: configuration
+      defaultValue: github-actions
+    - key: open-swe.config.commit_message_template
+      category: configuration
+      defaultValue: "fix: address issue #{issue_number}"
+    - key: open-swe.config.output_truncation_limit
+      category: configuration
+      defaultValue: '60000'
+    - key: open-swe.config.tool_output_truncation
+      category: configuration
+      defaultValue: '500'
+    - key: open-swe.config.http_timeout
+      category: configuration
+      defaultValue: '10'
+    - key: open-swe.config.pagination_limit
+      category: configuration
+      defaultValue: '100'
+    - key: open-swe.config.tool_call_log_frequency
+      category: configuration
+      defaultValue: '5'
+    - key: open-swe.config.pricing_api_url
+      category: configuration
+      defaultValue: 'https://models.dev/api.json'
+    - key: open-swe.config.temp_path_prefix
+      category: configuration
+      defaultValue: '/tmp/aap-sizing-target/'
+
+    # Reply templates
+    - key: open-swe.messages.review_addressed
+      category: messages
+      defaultValue: "Addressed in {sha}."
+    - key: open-swe.messages.review_acknowledged
+      category: messages
+      defaultValue: "Acknowledged."
+    - key: open-swe.messages.low_severity_marker
+      category: messages
+      defaultValue: "[LOW]"
 
     # Model configuration
     - key: open-swe.config.model

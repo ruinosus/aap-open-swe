@@ -24,12 +24,22 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
 
     from agent.config import (
         get_agent_instruction,
-        get_manifest,
+        get_commit_message_template,
+        get_default_agent_id,
+        get_default_branch_pattern,
+        get_git_identity,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
+        get_module_name,
+        get_output_truncation_limit,
+        get_prompt_template,
+        get_skill_branch,
+        get_skill_category,
         get_skill_instruction,
+        is_structured_output_skill,
         make_model,
+        uses_default_tools,
     )
     from agent.observability import (
         ProgressReporter,
@@ -50,9 +60,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     # Handle respond-review skill — no agent needed, just reply to PR comments
     skill_id = os.environ.get("SKILL_ID", "")
     pr_number = int(os.environ.get("PR_NUMBER", "0"))
-    from agent.config import get_skill_category as _get_skill_category
-
-    if _get_skill_category(skill_id) == "utility" and pr_number:
+    if get_skill_category(skill_id) == "utility" and pr_number:
         from agent.skills.review.responder import respond_to_review
 
         logger.info("Responding to review comments on PR #%d", pr_number)
@@ -95,26 +103,43 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True, virtual_mode=True)
 
         # Configure git identity
-        from agent.config import get_git_identity
-
         git_name, git_email = get_git_identity()
         sandbox.execute(f"git config user.name '{git_name}'")
         sandbox.execute(f"git config user.email '{git_email}'")
 
     with gh_group("Model loading"):
-        # Load model from manifest
+        # Load model from manifest with SDK cost tracking
         model_id = get_model_id()
+
+        cost_callbacks = []
+        try:
+            from cockpit_aap.runtime import CostCallbackHandler
+
+            from agent.config.manifest import _mi
+
+            cost_cb = CostCallbackHandler(
+                module_id=get_module_name(),
+                agent_id=get_default_agent_id(),
+                model_name=model_id,
+            )
+            cost_callbacks = [cost_cb]
+            logger.info("SDK CostCallbackHandler registered")
+        except Exception:
+            logger.debug("CostCallbackHandler not available", exc_info=True)
+
         model = make_model(
             model_id,
             temperature=get_model_temperature(),
             max_tokens=get_model_max_tokens(),
+            callbacks=cost_callbacks or None,
         )
         gh_notice(f"Model: {model_id}")
         progress.model_id = model_id
 
-    with gh_group(f"System prompt — {skill_id or 'swe-coder'}"):
+    _default_agent_id = get_default_agent_id()
+    with gh_group(f"System prompt — {skill_id or _default_agent_id}"):
         # Build system prompt — skill overrides base if specified
-        if skill_id and skill_id not in ("swe-coder", ""):
+        if skill_id and skill_id not in (_default_agent_id, ""):
             skill_instruction = get_skill_instruction(skill_id)
             if skill_instruction:
                 # Use simple string replace instead of .format() to avoid
@@ -127,11 +152,13 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
                     .replace("{issue_number}", str(issue_number))
                 )
             else:
-                logger.warning("Skill %s not found, falling back to swe-coder", skill_id)
+                logger.warning(
+                    "Skill %s not found, falling back to %s", skill_id, _default_agent_id
+                )
                 skill_id = ""  # fall through to default
                 system_prompt = ""
 
-        if not skill_id or skill_id == "swe-coder":
+        if not skill_id or skill_id == _default_agent_id:
             # Default swe-coder behavior
             manifest_instruction = get_agent_instruction()
             if manifest_instruction:
@@ -142,38 +169,26 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
                     agents_md_section="",
                 )
             else:
-                system_prompt = (
-                    f"You are a coding assistant. Your working directory is {repo_dir}. "
-                    "Use the execute tool to run commands. Be concise and focused."
-                )
+                # Fallback prompt from manifest artifact
+                fallback = get_prompt_template("fallback")
+                system_prompt = fallback.replace("{working_dir}", repo_dir) if fallback else ""
 
-        # Add GitHub Actions context to the prompt
-        system_prompt += f"""
-
----
-
-### GitHub Actions Context
-
-You are running inside a GitHub Actions workflow on repository {repo_owner}/{repo_name}.
-Issue/PR number: #{issue_number}
-
-When you are done with your changes:
-1. Run linters/formatters if available
-2. Stage and commit your changes with a descriptive message
-3. Push to a new branch named `aap-open-swe/issue-{issue_number}`
-4. The workflow will handle creating the PR and commenting on the issue.
-
-Do NOT call commit_and_open_pr or github_comment tools — they are not available here.
-Use the execute tool for all git operations.
-"""
-        gh_notice(f"Skill: {skill_id or 'swe-coder'}, prompt: {len(system_prompt)} chars")
+        # Append runner context from manifest artifact
+        _branch_pattern = get_default_branch_pattern().format(issue_number=issue_number)
+        runner_context = get_prompt_template("runner_context")
+        if runner_context:
+            system_prompt += (
+                runner_context.replace("{repo_owner}", repo_owner)
+                .replace("{repo_name}", repo_name)
+                .replace("{issue_number}", str(issue_number))
+                .replace("{branch_pattern}", _branch_pattern)
+            )
+        gh_notice(f"Skill: {skill_id or _default_agent_id}, prompt: {len(system_prompt)} chars")
 
     # Build response_format for review-type skills (structured output).
     # PR-type skills (doc-generator, test-generator, project-docs) need tool
     # calling to execute git commands, so they must NOT use response_format
     # which forces immediate JSON return without tool use.
-    from agent.config import get_skill_category, is_structured_output_skill, uses_default_tools
-
     response_format = None
     use_structured = is_structured_output_skill(skill_id)
     if use_structured:
@@ -191,53 +206,52 @@ Use the execute tool for all git operations.
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    # Build middleware stack
-    middleware = []
-    try:
-        from cockpit_aap import create_guardrail_middleware
+    # Build middleware stack from manifest + custom middleware
+    from cockpit_aap.runtime import create_middleware_stack
 
-        guardrail_mw = create_guardrail_middleware(
-            get_manifest(),
-            include_builtin_pii=True,
-        )
-        middleware.append(guardrail_mw)
-        logger.info("Added SDK guardrail middleware (manifest + PII)")
-    except Exception:
-        logger.warning("Could not create SDK guardrail middleware", exc_info=True)
-
-    # Repository protection — blocks pushes to repos outside ALLOWED_GITHUB_ORGS.
-    # External repos MUST be forked first. This is a critical safety guardrail.
     from agent.config import get_allowed_github_orgs
     from agent.middleware.repo_protection import create_repo_protection_middleware
 
+    _use_default_tools = uses_default_tools(skill_id)
+
+    # Custom middleware (not in SDK)
+    extra_middleware = []
+
+    # Repo protection — blocks pushes to unauthorized orgs
     repo_protection_mw = create_repo_protection_middleware(
         allowed_orgs=get_allowed_github_orgs(),
         current_repo_owner=repo_owner,
         current_repo_name=repo_name,
     )
     if repo_protection_mw:
-        middleware.append(repo_protection_mw)
-        logger.info("Added repo protection guardrail (whitelist: %s)", get_allowed_github_orgs())
+        extra_middleware.append(repo_protection_mw)
 
-    # Output validation (JSON structure) — kept as custom middleware
-    # since JSON schema validation has no equivalent in the SDK
-    if skill_id and skill_id not in ("swe-coder", ""):
+    # Output validation for skills with structured output
+    if skill_id and skill_id not in (_default_agent_id, ""):
         from agent.middleware.output_validator import create_output_validator
 
         output_mw = create_output_validator(skill_id)
         if output_mw:
-            middleware.append(output_mw)
+            extra_middleware.append(output_mw)
 
-    # Add ensure_no_empty_msg middleware for skills that use tools.
-    # This is the key insight from the original Open SWE: it forces the agent
-    # to ALWAYS call a tool on every turn, preventing early JSON-only returns.
-    _use_default_tools = uses_default_tools(skill_id)
-
+    # Ensure agent always calls a tool (prevents early JSON-only returns)
     if _use_default_tools:
         from agent.middleware.ensure_no_empty_msg import ensure_no_empty_msg
 
-        middleware.append(ensure_no_empty_msg)
-        logger.info("Added ensure_no_empty_msg middleware (forces tool usage)")
+        extra_middleware.append(ensure_no_empty_msg)
+
+    # SDK builds guardrail + rules + persona + skill middleware from manifest
+    # We pass our custom middleware via extra_middleware
+    from agent.config.manifest import _mi
+
+    middleware = create_middleware_stack(
+        _mi(),
+        copilotkit=False,
+        extra_middleware=extra_middleware,
+    )
+    logger.info(
+        "Middleware stack: %d layers (SDK + %d custom)", len(middleware), len(extra_middleware)
+    )
 
     with gh_group(f"Middleware stack ({len(middleware)} layers)"):
         logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
@@ -264,14 +278,14 @@ Use the execute tool for all git operations.
     callbacks, token_stats = create_callbacks(progress_reporter=progress, model_id=model_id)
     invoke_config["callbacks"] = callbacks
 
-    progress.start_phase(f"Agent ({skill_id or 'swe-coder'})")
+    progress.start_phase(f"Agent ({skill_id or _default_agent_id})")
 
     result = await agent.ainvoke(
         {"messages": [{"role": "user", "content": task}]},
         config=invoke_config,
     )
 
-    progress.complete_phase(f"Agent ({skill_id or 'swe-coder'})")
+    progress.complete_phase(f"Agent ({skill_id or _default_agent_id})")
 
     messages = result.get("messages", [])
     ai_messages = [
@@ -342,8 +356,6 @@ Use the execute tool for all git operations.
     has_changes = has_uncommitted or has_unpushed
 
     # Use skill-specific branch names
-    from agent.config import get_default_branch_pattern, get_skill_branch
-
     skill_branch = get_skill_branch(skill_id)
     branch_name = (
         skill_branch
@@ -368,7 +380,9 @@ Use the execute tool for all git operations.
             if has_uncommitted:
                 # Uncommitted changes — commit them
                 sandbox.execute("git add -A")
-                sandbox.execute(f'git commit -m "fix: address issue #{issue_number}"')
+                sandbox.execute(
+                    f'git commit -m "{get_commit_message_template().format(issue_number=issue_number)}"'
+                )
 
             if branch_name in ("main", "master"):
                 # Don't push to main — create a feature branch
@@ -398,7 +412,7 @@ Use the execute tool for all git operations.
     )
 
     execution_report = build_execution_report(
-        skill_id=skill_id or "swe-coder",
+        skill_id=skill_id or _default_agent_id,
         model_id=model_id,
         repo_owner=repo_owner,
         repo_name=repo_name,
@@ -421,11 +435,12 @@ Use the execute tool for all git operations.
     # Output results for the workflow
     # agent_response keeps the raw output for downstream JSON parsing
     # execution_report is the formatted markdown for issue comments
+    _truncation_limit = get_output_truncation_limit()
     outputs = {
         "has_changes": has_changes,
         "branch_name": branch_name if has_changes else "",
-        "agent_response": execution_report[:60000],
-        "agent_response_raw": agent_response[:60000],
+        "agent_response": execution_report[:_truncation_limit],
+        "agent_response_raw": agent_response[:_truncation_limit],
     }
 
     github_output = os.environ.get("GITHUB_OUTPUT", "")
@@ -434,7 +449,7 @@ Use the execute tool for all git operations.
             f.write(f"has_changes={'true' if has_changes else 'false'}\n")
             f.write(f"branch_name={branch_name}\n")
             f.write(
-                f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{execution_report[:60000]}\nAGENT_RESPONSE_EOF_7f3c9a\n"
+                f"agent_response<<AGENT_RESPONSE_EOF_7f3c9a\n{execution_report[:_truncation_limit]}\nAGENT_RESPONSE_EOF_7f3c9a\n"
             )
     else:
         print(json.dumps(outputs, indent=2))
