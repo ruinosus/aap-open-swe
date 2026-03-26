@@ -92,14 +92,13 @@ GOOGLE_API_KEY=...
 
 ## AAP SDK Integration
 
-The `agent/aap_config.py` module provides 34 typed accessor functions:
+The `agent/config/manifest.py` module provides typed accessor functions for manifest-driven configuration:
 
 ```python
 from agent.aap_config import (
     get_model_id,           # "openai:gpt-4o"
     get_agent_instruction,  # 10K+ chars system prompt
     get_skills,             # [ManifestSkill(...), ...] — 5 skills
-    get_skill_adapter,      # ManifestSkillAdapter for trigger detection
     get_rules,              # [ManifestRule(...), ...]
     get_guardrails,         # {"input": [...], "output": [...]}
     is_telemetry_enabled,   # True
@@ -127,7 +126,7 @@ Sandbox (local/cloud)            <- Isolated code execution
 
 ## Skills
 
-Skills sao declarativas — adicionar uma nova requer apenas um markdown + entrada no manifest:
+Skills sao declarativas — adicionar uma nova requer apenas um markdown + entrada no manifest. O runtime tambem diferencia skills por categoria e formato de saida para decidir entre ferramentas, output estruturado e publicacao em PR:
 
 ```
 .aap/open-swe/skills/
@@ -164,3 +163,9 @@ See [INSTALLATION.md](INSTALLATION.md) for the full setup guide.
 
 - [Open SWE](https://github.com/langchain-ai/open-swe) by LangChain (MIT License)
 - [AAP SDK](https://github.com/ruinosus/aap-sdk) by Avanade
+
+
+## Documentation
+
+- `docs/superpowers/specs/2026-03-26-manifest-driven-runtime-design.md` descreve o runtime dirigido por manifest.
+- `docs/superpowers/specs/2026-03-26-aap-sdk-skill-extensions.md` documenta os campos extras das skills usados pela compatibilidade atual.
