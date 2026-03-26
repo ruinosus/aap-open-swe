@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from agent.utils.langsmith import get_langsmith_trace_url
+from agent.server.langsmith import get_langsmith_trace_url
 
 logger = logging.getLogger(__name__)
 

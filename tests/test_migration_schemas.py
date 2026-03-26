@@ -1,6 +1,6 @@
 """Tests for migration skill schemas."""
 
-from agent.schemas import MigrationOutput, SizingFinding, SizingLayerSummary, SizingOutput
+from agent.skills.schemas import MigrationOutput, SizingFinding, SizingLayerSummary, SizingOutput
 
 
 def test_sizing_finding_valid():

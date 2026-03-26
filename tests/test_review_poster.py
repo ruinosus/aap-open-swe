@@ -4,7 +4,7 @@ import json
 
 
 def test_parse_review_output_valid_json():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     raw = json.dumps(
         {
@@ -23,14 +23,14 @@ def test_parse_review_output_valid_json():
 
 
 def test_parse_review_output_no_json():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     result = parse_review_output("Just a plain text response with no JSON")
     assert result is None
 
 
 def test_parse_review_output_wrong_type():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     raw = json.dumps({"skill_output_type": "pr", "summary": "test"})
     result = parse_review_output(raw)
@@ -38,7 +38,7 @@ def test_parse_review_output_wrong_type():
 
 
 def test_parse_review_output_markdown_code_block():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     raw = """Here is my analysis of the code:
 
@@ -54,7 +54,7 @@ That's my review."""
 
 
 def test_parse_review_output_prose_before_json():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     raw = """I've analyzed the code and found several issues.
 
@@ -65,7 +65,7 @@ def test_parse_review_output_prose_before_json():
 
 
 def test_parse_review_output_lenient_no_skill_output_type():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     # Some models may omit skill_output_type but still have the right structure
     raw = json.dumps(
@@ -81,14 +81,14 @@ def test_parse_review_output_lenient_no_skill_output_type():
 
 
 def test_parse_review_output_empty_string():
-    from agent.review_poster import parse_review_output
+    from agent.skills.review.poster import parse_review_output
 
     assert parse_review_output("") is None
     assert parse_review_output("   ") is None
 
 
 def test_format_review_summary():
-    from agent.review_poster import format_review_summary
+    from agent.skills.review.poster import format_review_summary
 
     review = {
         "summary": "Found 2 issues",

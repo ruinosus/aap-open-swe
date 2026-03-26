@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent.utils.repo import extract_repo_from_text
+from agent.github.repo import extract_repo_from_text
 
 
 class TestExtractRepoFromText:
@@ -75,12 +75,12 @@ class TestLinearWebhookRepoOverride:
 
     @pytest.mark.asyncio
     async def test_comment_repo_overrides_team_mapping(self, _base_payload: dict) -> None:
-        from agent.webapp import linear_webhook
+        from agent.server.webapp import linear_webhook
 
         with (
-            patch("agent.webapp.verify_linear_signature", return_value=True),
+            patch("agent.server.webapp.verify_linear_signature", return_value=True),
             patch(
-                "agent.webapp.fetch_linear_issue_details",
+                "agent.server.webapp.fetch_linear_issue_details",
                 new_callable=AsyncMock,
                 return_value={
                     "id": "issue-456",
@@ -92,8 +92,8 @@ class TestLinearWebhookRepoOverride:
                     "comments": {"nodes": []},
                 },
             ),
-            patch("agent.webapp._is_repo_org_allowed", return_value=True),
-            patch("agent.webapp.BackgroundTasks"),
+            patch("agent.server.webapp._is_repo_org_allowed", return_value=True),
+            patch("agent.server.webapp.BackgroundTasks"),
         ):
             mock_request = AsyncMock()
             mock_request.body.return_value = json.dumps(_base_payload).encode()
@@ -111,7 +111,7 @@ class TestLinearWebhookRepoOverride:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_team_mapping_when_no_repo_in_comment(self) -> None:
-        from agent.webapp import linear_webhook
+        from agent.server.webapp import linear_webhook
 
         payload = {
             "type": "Comment",
@@ -128,9 +128,9 @@ class TestLinearWebhookRepoOverride:
         }
 
         with (
-            patch("agent.webapp.verify_linear_signature", return_value=True),
+            patch("agent.server.webapp.verify_linear_signature", return_value=True),
             patch(
-                "agent.webapp.fetch_linear_issue_details",
+                "agent.server.webapp.fetch_linear_issue_details",
                 new_callable=AsyncMock,
                 return_value={
                     "id": "issue-456",
@@ -142,7 +142,7 @@ class TestLinearWebhookRepoOverride:
                     "comments": {"nodes": []},
                 },
             ),
-            patch("agent.webapp._is_repo_org_allowed", return_value=True),
+            patch("agent.server.webapp._is_repo_org_allowed", return_value=True),
         ):
             mock_request = AsyncMock()
             mock_request.body.return_value = json.dumps(payload).encode()

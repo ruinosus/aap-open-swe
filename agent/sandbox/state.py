@@ -1,17 +1,62 @@
-"""Helpers for resolving portable writable paths inside sandboxes."""
+"""Sandbox creation, path resolution, and shared state."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import posixpath
 import shlex
 from collections.abc import Iterable
 from typing import Any
 
 from deepagents.backends.protocol import SandboxBackendProtocol
+from langgraph.config import get_config
+
+from agent.sandbox.providers.daytona import create_daytona_sandbox
+from agent.sandbox.providers.langsmith import create_langsmith_sandbox
+from agent.sandbox.providers.local import create_local_sandbox
+from agent.sandbox.providers.modal import create_modal_sandbox
+from agent.sandbox.providers.runloop import create_runloop_sandbox
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Sandbox factory / creation (from agent.utils.sandbox)
+# ---------------------------------------------------------------------------
+
+SANDBOX_FACTORIES = {
+    "langsmith": create_langsmith_sandbox,
+    "daytona": create_daytona_sandbox,
+    "modal": create_modal_sandbox,
+    "runloop": create_runloop_sandbox,
+    "local": create_local_sandbox,
+}
+
+
+def create_sandbox(sandbox_id: str | None = None):
+    """Create or reconnect to a sandbox using the configured provider.
+
+    The provider is selected via the SANDBOX_TYPE environment variable.
+    Supported values: langsmith (default), daytona, modal, runloop, local.
+
+    Args:
+        sandbox_id: Optional existing sandbox ID to reconnect to.
+
+    Returns:
+        A sandbox backend implementing SandboxBackendProtocol.
+    """
+    sandbox_type = os.getenv("SANDBOX_TYPE", "langsmith")
+    factory = SANDBOX_FACTORIES.get(sandbox_type)
+    if not factory:
+        supported = ", ".join(sorted(SANDBOX_FACTORIES))
+        raise ValueError(f"Invalid sandbox type: {sandbox_type}. Supported types: {supported}")
+    return factory(sandbox_id)
+
+
+# ---------------------------------------------------------------------------
+# Path resolution helpers (from agent.utils.sandbox_paths)
+# ---------------------------------------------------------------------------
 
 _WORK_DIR_CACHE_ATTR = "_open_swe_resolved_work_dir"
 _PROVIDER_ATTR_NAMES = ("sandbox", "_sandbox")
@@ -151,3 +196,41 @@ def _cache_work_dir(sandbox_backend: SandboxBackendProtocol, work_dir: str) -> N
         setattr(sandbox_backend, _WORK_DIR_CACHE_ATTR, work_dir)
     except Exception:
         logger.debug("Failed to cache sandbox work dir on %s", type(sandbox_backend).__name__)
+
+
+# ---------------------------------------------------------------------------
+# Shared sandbox state (from agent.utils.sandbox_state)
+# ---------------------------------------------------------------------------
+
+# Thread ID -> SandboxBackend mapping, shared between server.py and middleware
+SANDBOX_BACKENDS: dict[str, Any] = {}
+
+
+async def get_sandbox_id_from_metadata(thread_id: str) -> str | None:
+    """Fetch sandbox_id from thread metadata."""
+    try:
+        config = get_config()
+    except Exception:
+        logger.exception("Failed to read thread metadata for sandbox")
+        return None
+    return config.get("metadata", {}).get("sandbox_id")
+
+
+async def get_sandbox_backend(thread_id: str) -> Any | None:
+    """Get sandbox backend from cache, or connect using thread metadata."""
+    sandbox_backend = SANDBOX_BACKENDS.get(thread_id)
+    if sandbox_backend:
+        return sandbox_backend
+
+    sandbox_id = await get_sandbox_id_from_metadata(thread_id)
+    if not sandbox_id:
+        raise ValueError(f"Missing sandbox_id in thread metadata for {thread_id}")
+
+    sandbox_backend = await asyncio.to_thread(create_sandbox, sandbox_id)
+    SANDBOX_BACKENDS[thread_id] = sandbox_backend
+    return sandbox_backend
+
+
+def get_sandbox_backend_sync(thread_id: str) -> Any | None:
+    """Sync wrapper for get_sandbox_backend."""
+    return asyncio.run(get_sandbox_backend(thread_id))

@@ -53,7 +53,7 @@ async def test_manifest_loading():
     """Test 1: Verify manifest loads correctly via aap_config."""
     print("\n━━━ Test 1: Manifest Loading ━━━")
 
-    from agent.aap_config import (
+    from agent.config import (
         get_agent_instruction,
         get_guardrails,
         get_manifest,
@@ -108,13 +108,13 @@ async def test_agent_creation():
     """Test 3: Create the Deep Agent with manifest config."""
     print("\n━━━ Test 3: Agent Creation ━━━")
 
-    from agent.aap_config import (
+    from agent.config import (
         get_agent_instruction,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
+        make_model,
     )
-    from agent.utils.model import make_model
 
     model_id = get_model_id()
     temperature = get_model_temperature()
@@ -142,12 +142,12 @@ async def test_agent_invocation():
 
     from deepagents import create_deep_agent
 
-    from agent.aap_config import (
+    from agent.config import (
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
+        make_model,
     )
-    from agent.utils.model import make_model
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create a small test file in the sandbox

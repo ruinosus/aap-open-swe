@@ -38,7 +38,6 @@ class GuardrailSuggestion(_StrictSchema):
     pattern: str = Field(description="Regex pattern to detect the vulnerability")
     action: str = Field(description="'block' or 'rewrite'")
     finding_ids: list[int] = Field(
-        default_factory=list,
         description="Indices of comments[] this guardrail would prevent (0-based)",
     )
 

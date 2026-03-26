@@ -1,4 +1,4 @@
-from .utils.github_comments import UNTRUSTED_GITHUB_COMMENT_OPEN_TAG
+from ..github.comments import UNTRUSTED_GITHUB_COMMENT_OPEN_TAG
 
 WORKING_ENV_SECTION = """---
 

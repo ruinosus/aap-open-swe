@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from agent.review_responder import get_changed_files_since, respond_to_review
+from agent.skills.review.responder import get_changed_files_since, respond_to_review
 
 
 class TestGetChangedFiles:
@@ -20,9 +20,9 @@ class TestGetChangedFiles:
 
 
 class TestRespondToReview:
-    @patch("agent.review_responder.reply_to_comment")
-    @patch("agent.review_responder.get_changed_files_since")
-    @patch("agent.review_responder.get_review_comments")
+    @patch("agent.skills.review.responder.reply_to_comment")
+    @patch("agent.skills.review.responder.get_changed_files_since")
+    @patch("agent.skills.review.responder.get_review_comments")
     @patch("subprocess.run")
     def test_replies_to_fixed_comments(self, mock_git, mock_get, mock_changed, mock_reply):
         mock_git.return_value = MagicMock(returncode=0, stdout="abc1234")
@@ -42,9 +42,9 @@ class TestRespondToReview:
         assert stats["replied"] == 1
         mock_reply.assert_called_once()
 
-    @patch("agent.review_responder.reply_to_comment")
-    @patch("agent.review_responder.get_changed_files_since")
-    @patch("agent.review_responder.get_review_comments")
+    @patch("agent.skills.review.responder.reply_to_comment")
+    @patch("agent.skills.review.responder.get_changed_files_since")
+    @patch("agent.skills.review.responder.get_review_comments")
     @patch("subprocess.run")
     def test_skips_already_replied(self, mock_git, mock_get, mock_changed, mock_reply):
         mock_git.return_value = MagicMock(returncode=0, stdout="abc1234")
@@ -70,9 +70,9 @@ class TestRespondToReview:
         assert stats["already_replied"] == 1
         mock_reply.assert_not_called()
 
-    @patch("agent.review_responder.reply_to_comment")
-    @patch("agent.review_responder.get_changed_files_since")
-    @patch("agent.review_responder.get_review_comments")
+    @patch("agent.skills.review.responder.reply_to_comment")
+    @patch("agent.skills.review.responder.get_changed_files_since")
+    @patch("agent.skills.review.responder.get_review_comments")
     @patch("subprocess.run")
     def test_acknowledges_low_severity(self, mock_git, mock_get, mock_changed, mock_reply):
         mock_git.return_value = MagicMock(returncode=0, stdout="abc1234")
@@ -93,7 +93,7 @@ class TestRespondToReview:
         mock_reply.assert_called_once()
         assert "Acknowledged" in mock_reply.call_args[0][4]
 
-    @patch("agent.review_responder.get_review_comments")
+    @patch("agent.skills.review.responder.get_review_comments")
     def test_empty_comments(self, mock_get):
         mock_get.return_value = []
         stats = respond_to_review("owner", "repo", 1, "tok")

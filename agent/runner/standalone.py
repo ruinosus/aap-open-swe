@@ -11,117 +11,10 @@ import os
 import sys
 import time
 
+from agent.runner.sizing_formatter import format_sizing_markdown
+
 logging.basicConfig(level=logging.INFO, format="%(name)s | %(message)s")
 logger = logging.getLogger("run_standalone")
-
-
-def _format_sizing_markdown(agent_response: str) -> str:
-    """Format sizing JSON output as rich markdown for GitHub issue comments."""
-    data = None
-    try:
-        parsed = json.loads(agent_response)
-        if isinstance(parsed, list):
-            for block in parsed:
-                if isinstance(block, dict) and block.get("text"):
-                    try:
-                        data = json.loads(block["text"])
-                        break
-                    except (json.JSONDecodeError, TypeError):
-                        continue
-        elif isinstance(parsed, dict) and parsed.get("skill_output_type"):
-            data = parsed
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    if not data or data.get("skill_output_type") != "sizing":
-        return agent_response
-
-    layer_emoji = {
-        1: "\U0001f9f1",
-        2: "\U0001f527",
-        3: "\U0001f3a8",
-        4: "\U0001f6e1\ufe0f",
-        5: "\u2728",
-        6: "\U0001f4bb",
-    }
-    impact_emoji = {"high": "\U0001f534", "medium": "\U0001f7e1", "low": "\U0001f7e2"}
-    lines = []
-
-    lines.append("## \U0001f4ca AAP SDK Migration \u2014 Sizing Report")
-    lines.append("")
-    lines.append("| Metric | Value |")
-    lines.append("|--------|-------|")
-    lines.append(f"| **Repository** | {data.get('repo_url', 'N/A')} |")
-    repo_type = data.get("repo_type", "unknown")
-    type_label = (
-        "\U0001f500 External (fork required)" if repo_type == "external" else "\U0001f3e0 Internal"
-    )
-    lines.append(f"| **Type** | {type_label} |")
-    lines.append(f"| **Languages** | {', '.join(data.get('languages', []))} |")
-    lines.append(f"| **Total Findings** | **{data.get('total_findings', 0)}** |")
-    lines.append("")
-
-    layers = data.get("layers", [])
-    if layers:
-        lines.append("### Layers")
-        lines.append("")
-        lines.append("| Layer | Name | Findings | Breaking? |")
-        lines.append("|-------|------|----------|-----------|")
-        for la in layers:
-            num = la.get("layer", 0)
-            emoji = layer_emoji.get(num, "\U0001f4e6")
-            name = la.get("name", "")
-            count = la.get("count", la.get("findings_count", 0))
-            breaking = "\u26a0\ufe0f Yes" if la.get("is_breaking") else "\u2705 No"
-            lines.append(f"| {emoji} {num} | **{name}** | {count} | {breaking} |")
-        lines.append("")
-
-    findings = data.get("findings", [])
-    if findings:
-        lines.append("<details>")
-        lines.append(f"<summary>\U0001f4cb Detailed Findings ({len(findings)})</summary>")
-        lines.append("")
-        lines.append("| # | Layer | Impact | File | Description |")
-        lines.append("|---|-------|--------|------|-------------|")
-        for i, f in enumerate(findings):
-            imp = f.get("impact", "low")
-            ie = impact_emoji.get(imp, "\u26aa")
-            fp = f.get("file_path", f.get("file", "")).replace("/tmp/aap-sizing-target/", "")
-            desc = (f.get("title", "") or f.get("rationale", "") or f.get("description", ""))[:80]
-            lines.append(f"| {i + 1} | L{f.get('layer', '?')} | {ie} {imp} | `{fp}` | {desc} |")
-        lines.append("")
-        lines.append("</details>")
-        lines.append("")
-
-    proposed = data.get("proposed_structure", [])
-    if proposed:
-        lines.append("<details>")
-        lines.append(
-            f"<summary>\U0001f4c1 Proposed .aap/ Structure ({len(proposed)} files)</summary>"
-        )
-        lines.append("")
-        lines.append("```")
-        for p in proposed:
-            lines.append(p)
-        lines.append("```")
-        lines.append("")
-        lines.append("</details>")
-        lines.append("")
-
-    lines.append("### Next Steps")
-    lines.append("")
-    lines.append("```")
-    lines.append("@aap-open-swe migrate --layer=core        # \U0001f9f1 Safe, non-breaking")
-    lines.append("@aap-open-swe migrate --layer=tools       # \U0001f527 Safe, non-breaking")
-    lines.append("@aap-open-swe migrate --layer=frontend    # \U0001f3a8 \u26a0\ufe0f BREAKING")
-    lines.append("@aap-open-swe migrate --layer=governance  # \U0001f6e1\ufe0f Safe, non-breaking")
-    lines.append("@aap-open-swe migrate --layer=polish      # \u2728 Safe, non-breaking")
-    lines.append(
-        "@aap-open-swe migrate --layer=code        # \U0001f4bb \u26a0\ufe0f BREAKING (refactors source)"
-    )
-    lines.append("```")
-
-    return "\n".join(lines)
 
 
 async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, issue_number: int):
@@ -129,13 +22,14 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     from deepagents import create_deep_agent
     from deepagents.backends import LocalShellBackend
 
-    from agent.aap_config import (
+    from agent.config import (
         get_agent_instruction,
         get_manifest,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
         get_skill_instruction,
+        make_model,
     )
     from agent.observability import (
         ProgressReporter,
@@ -145,7 +39,6 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         write_step_summary,
     )
     from agent.observability.streaming_callback import create_callbacks
-    from agent.utils.model import make_model
 
     _start_time = time.time()
 
@@ -158,7 +51,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     skill_id = os.environ.get("SKILL_ID", "")
     pr_number = int(os.environ.get("PR_NUMBER", "0"))
     if skill_id == "respond-review" and pr_number:
-        from agent.review_responder import respond_to_review
+        from agent.skills.review.responder import respond_to_review
 
         logger.info("Responding to review comments on PR #%d", pr_number)
         stats = respond_to_review(repo_owner, repo_name, pr_number, github_token, repo_dir)
@@ -280,7 +173,7 @@ Use the execute tool for all git operations.
         try:
             from langchain.agents.structured_output import ProviderStrategy
 
-            from agent.schemas import SKILL_SCHEMAS
+            from agent.skills.schemas import SKILL_SCHEMAS
 
             schema = SKILL_SCHEMAS.get(skill_id)
             if schema:
@@ -307,7 +200,7 @@ Use the execute tool for all git operations.
 
     # Repository protection — blocks pushes to repos outside ALLOWED_GITHUB_ORGS.
     # External repos MUST be forked first. This is a critical safety guardrail.
-    from agent.aap_config import get_allowed_github_orgs
+    from agent.config import get_allowed_github_orgs
     from agent.middleware.repo_protection import create_repo_protection_middleware
 
     repo_protection_mw = create_repo_protection_middleware(
@@ -357,7 +250,7 @@ Use the execute tool for all git operations.
 
     # Set recursion_limit high enough for multi-step tasks.
     # Original Open SWE uses 1000. A 5-layer migration may need 50+ turns.
-    from agent.aap_config import get_recursion_limit
+    from agent.config import get_recursion_limit
 
     invoke_config = {"recursion_limit": get_recursion_limit()}
     logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
@@ -408,7 +301,7 @@ Use the execute tool for all git operations.
 
     # Post review if skill is review-type
     if skill_id in ("code-review", "security-scan") and pr_number:
-        from agent.review_poster import parse_review_output, post_pr_review
+        from agent.skills.review.poster import parse_review_output, post_pr_review
 
         # Prefer structured_data if available, else parse from free-form text
         review = None
@@ -488,7 +381,7 @@ Use the execute tool for all git operations.
 
     # Format sizing reports as rich markdown before output
     if skill_id == "aap-sizing":
-        agent_response = _format_sizing_markdown(agent_response)
+        agent_response = format_sizing_markdown(agent_response)
 
     # Build execution report first, then finalize progress with it
     progress.update_tokens(

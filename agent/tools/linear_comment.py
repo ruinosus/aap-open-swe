@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any
 
-from ..utils.linear import comment_on_linear_issue
+from ..linear.client import comment_on_linear_issue
 
 
 def linear_comment(comment_body: str, ticket_id: str) -> dict[str, Any]:
