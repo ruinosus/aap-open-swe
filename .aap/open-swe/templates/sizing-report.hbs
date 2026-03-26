@@ -7,46 +7,46 @@
 | **Languages** | {{languages}} |
 | **Total Findings** | **{{total_findings}}** |
 
-{{#if layers}}
+{{#layers}}
 ### Layers
 
 | Layer | Name | Findings | Breaking? |
 |-------|------|----------|-----------|
-{{#each layers}}
+{{#layers}}
 | {{icon}} {{layer}} | **{{name}}** | {{count}} | {{breaking_label}} |
-{{/each}}
-{{/if}}
+{{/layers}}
+{{/layers}}
 
-{{#if findings}}
+{{#findings}}
 <details>
 <summary>{{findings_icon}} Detailed Findings ({{findings_count}})</summary>
 
 | # | Layer | Impact | File | Description |
 |---|-------|--------|------|-------------|
-{{#each findings}}
+{{#findings}}
 | {{index}} | L{{layer}} | {{impact_icon}} {{impact}} | `{{file}}` | {{description}} |
-{{/each}}
+{{/findings}}
 
 </details>
-{{/if}}
+{{/findings}}
 
-{{#if proposed_structure}}
+{{#proposed_structure}}
 <details>
 <summary>{{folder_icon}} Proposed .aap/ Structure ({{structure_count}} files)</summary>
 
 ```
-{{#each proposed_structure}}
-{{this}}
-{{/each}}
+{{#proposed_structure}}
+{{.}}
+{{/proposed_structure}}
 ```
 
 </details>
-{{/if}}
+{{/proposed_structure}}
 
 ### Next Steps
 
 ```
-{{#each next_steps}}
-{{this}}
-{{/each}}
+{{#next_steps}}
+{{.}}
+{{/next_steps}}
 ```

@@ -12,15 +12,50 @@ logger = logging.getLogger("templates")
 # Cache loaded template strings
 _template_cache: dict[str, str] = {}
 
+# Known template name → filename mapping (convention-based fallback)
+_TEMPLATE_FILES = {
+    "executionReport": "execution-report.hbs",
+    "sizingReport": "sizing-report.hbs",
+    "reviewSummary": "review-summary.hbs",
+    "progressComment": "progress-comment.hbs",
+    "prDescription": "pr-description.hbs",
+}
 
-def _manifest_dir() -> Path:
-    """Get the .aap/open-swe/ directory path."""
-    mi = _mi()
-    return Path(mi.path) if mi.path else Path(".aap/open-swe")
+
+def _find_template_file(name: str) -> Path | None:
+    """Find a template file by name, checking manifest config then convention."""
+    # Try manifest spec.templates first
+    try:
+        mi = _mi()
+        spec = mi.manifest
+        templates = getattr(getattr(spec, "spec", None), "templates", None)
+        if templates:
+            path_str = (
+                templates.get(name)
+                if isinstance(templates, dict)
+                else getattr(templates, name, None)
+            )
+            if path_str:
+                manifest_dir = Path(mi.path) if mi.path else Path(".aap/open-swe")
+                template_path = manifest_dir / path_str
+                if template_path.exists():
+                    return template_path
+    except Exception:
+        pass
+
+    # Convention-based fallback: look in .aap/open-swe/templates/
+    filename = _TEMPLATE_FILES.get(name)
+    if filename:
+        for base in [Path(".aap/open-swe/templates"), Path("../../.aap/open-swe/templates")]:
+            path = base / filename
+            if path.exists():
+                return path
+
+    return None
 
 
 def get_template(name: str) -> str | None:
-    """Load a template by name from spec.templates.
+    """Load a template by name.
 
     Args:
         name: Template name (e.g., "executionReport", "sizingReport")
@@ -31,26 +66,11 @@ def get_template(name: str) -> str | None:
     if name in _template_cache:
         return _template_cache[name]
 
-    mi = _mi()
-    spec = mi.manifest
-    templates = getattr(getattr(spec, "spec", None), "templates", None)
-    if not templates:
+    path = _find_template_file(name)
+    if not path:
         return None
 
-    # templates is a dict or object with template names as keys
-    path_str = (
-        templates.get(name) if isinstance(templates, dict) else getattr(templates, name, None)
-    )
-    if not path_str:
-        return None
-
-    # Resolve relative to manifest directory
-    template_path = _manifest_dir() / path_str
-    if not template_path.exists():
-        logger.warning("Template file not found: %s", template_path)
-        return None
-
-    content = template_path.read_text()
+    content = path.read_text()
     _template_cache[name] = content
     return content
 

@@ -8,32 +8,33 @@
 ### What was done
 {{summary}}
 
-{{#if guardrail_suggestions}}
+{{#guardrail_suggestions}}
 
 **Suggested guardrails** ({{guardrail_count}}):
-{{#each guardrail_suggestions}}
+{{#guardrail_suggestions}}
 - `{{name}}` — {{description}} ({{phase}}/{{action}})
-{{/each}}
-{{/if}}
+{{/guardrail_suggestions}}
+{{/guardrail_suggestions}}
 
 ### Metrics
 | Metric | Value |
 |--------|-------|
 | **Skill** | `{{skill_id}}` |
 | **Model** | `{{model_id}}` |
-{{#if llm_calls}}| LLM calls | {{llm_calls}} |
-{{/if}}{{#if total_tokens}}| Input tokens | {{input_tokens}} |
+{{#llm_calls}}| LLM calls | {{llm_calls}} |
+{{/llm_calls}}{{#total_tokens}}| Input tokens | {{input_tokens}} |
 | Output tokens | {{output_tokens}} |
 | Total tokens | {{total_tokens}} |
-{{/if}}{{#if tool_calls}}| Tool calls | {{tool_calls}} |
-{{/if}}| Duration | {{duration}} |
-{{#if estimated_cost}}| **Estimated cost** | **{{cost}}** |
-{{/if}}
-{{#if raw_output}}
+{{/total_tokens}}{{#tool_calls}}| Tool calls | {{tool_calls}} |
+{{/tool_calls}}| Duration | {{duration}} |
+{{#estimated_cost}}| **Estimated cost** | **{{estimated_cost}}** |
+{{/estimated_cost}}
+
+{{#raw_output}}
 <details>
 <summary>Raw agent output</summary>
 
 {{raw_output}}
 
 </details>
-{{/if}}
+{{/raw_output}}

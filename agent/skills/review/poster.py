@@ -129,21 +129,8 @@ def format_review_summary(review: dict, skill_id: str) -> str:
             "comment_count": len(comments) if comments else 0,
         },
     )
-    if rendered:
-        return rendered
 
-    # Fallback to Python formatting
-    md = f"### {module_name} — {skill_name}\n\n"
-    md += f"**Score:** {score}\n\n"
-    md += f"{summary}\n\n"
-    if severity_line:
-        md += f"**Findings:** {severity_line}\n\n"
-    if comments:
-        md += f"**{len(comments)} inline comment(s)** posted on this PR.\n"
-    else:
-        md += "No issues found.\n"
-
-    return md
+    return rendered or ""
 
 
 def post_pr_review(

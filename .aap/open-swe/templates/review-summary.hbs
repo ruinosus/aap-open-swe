@@ -4,8 +4,8 @@
 
 {{summary}}
 
-{{#if severity_line}}**Findings:** {{severity_line}}{{/if}}
+{{#severity_line}}**Findings:** {{severity_line}}{{/severity_line}}
 
-{{#if comment_count}}**{{comment_count}} inline comment(s)** posted on this PR.
-{{else}}No issues found.
-{{/if}}
+{{#comment_count}}**{{comment_count}} inline comment(s)** posted on this PR.
+{{/comment_count}}{{^comment_count}}No issues found.
+{{/comment_count}}
