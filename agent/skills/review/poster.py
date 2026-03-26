@@ -140,6 +140,8 @@ def post_pr_review(
 
     Returns True if successful, False otherwise.
     """
+    from agent.config import get_http_timeout
+
     token = github_token or os.environ.get("GITHUB_TOKEN", "")
     if not token:
         logger.error("No GitHub token available for posting review")
@@ -172,7 +174,7 @@ def post_pr_review(
     }
 
     try:
-        resp = httpx.post(api_url, headers=headers, json=payload, timeout=30)
+        resp = httpx.post(api_url, headers=headers, json=payload, timeout=get_http_timeout() * 3)
         if resp.status_code in (200, 201):
             logger.info("Posted PR review with %d inline comments", len(review_comments))
             return True

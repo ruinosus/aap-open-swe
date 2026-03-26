@@ -28,10 +28,10 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_default_agent_id,
         get_default_branch_pattern,
         get_git_identity,
-        get_manifest,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
+        get_module_name,
         get_output_truncation_limit,
         get_prompt_template,
         get_skill_branch,
@@ -108,12 +108,30 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         sandbox.execute(f"git config user.email '{git_email}'")
 
     with gh_group("Model loading"):
-        # Load model from manifest
+        # Load model from manifest with SDK cost tracking
         model_id = get_model_id()
+
+        cost_callbacks = []
+        try:
+            from cockpit_aap.runtime import CostCallbackHandler
+
+            from agent.config.manifest import _mi
+
+            cost_cb = CostCallbackHandler(
+                module_id=get_module_name(),
+                agent_id=get_default_agent_id(),
+                model_name=model_id,
+            )
+            cost_callbacks = [cost_cb]
+            logger.info("SDK CostCallbackHandler registered")
+        except Exception:
+            logger.debug("CostCallbackHandler not available", exc_info=True)
+
         model = make_model(
             model_id,
             temperature=get_model_temperature(),
             max_tokens=get_model_max_tokens(),
+            callbacks=cost_callbacks or None,
         )
         gh_notice(f"Model: {model_id}")
         progress.model_id = model_id
@@ -188,53 +206,52 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
                 "Could not set up structured output, falling back to free-form", exc_info=True
             )
 
-    # Build middleware stack
-    middleware = []
-    try:
-        from cockpit_aap import create_guardrail_middleware
+    # Build middleware stack from manifest + custom middleware
+    from cockpit_aap.runtime import create_middleware_stack
 
-        guardrail_mw = create_guardrail_middleware(
-            get_manifest(),
-            include_builtin_pii=True,
-        )
-        middleware.append(guardrail_mw)
-        logger.info("Added SDK guardrail middleware (manifest + PII)")
-    except Exception:
-        logger.warning("Could not create SDK guardrail middleware", exc_info=True)
-
-    # Repository protection — blocks pushes to repos outside ALLOWED_GITHUB_ORGS.
-    # External repos MUST be forked first. This is a critical safety guardrail.
     from agent.config import get_allowed_github_orgs
     from agent.middleware.repo_protection import create_repo_protection_middleware
 
+    _use_default_tools = uses_default_tools(skill_id)
+
+    # Custom middleware (not in SDK)
+    extra_middleware = []
+
+    # Repo protection — blocks pushes to unauthorized orgs
     repo_protection_mw = create_repo_protection_middleware(
         allowed_orgs=get_allowed_github_orgs(),
         current_repo_owner=repo_owner,
         current_repo_name=repo_name,
     )
     if repo_protection_mw:
-        middleware.append(repo_protection_mw)
-        logger.info("Added repo protection guardrail (whitelist: %s)", get_allowed_github_orgs())
+        extra_middleware.append(repo_protection_mw)
 
-    # Output validation (JSON structure) — kept as custom middleware
-    # since JSON schema validation has no equivalent in the SDK
+    # Output validation for skills with structured output
     if skill_id and skill_id not in (_default_agent_id, ""):
         from agent.middleware.output_validator import create_output_validator
 
         output_mw = create_output_validator(skill_id)
         if output_mw:
-            middleware.append(output_mw)
+            extra_middleware.append(output_mw)
 
-    # Add ensure_no_empty_msg middleware for skills that use tools.
-    # This is the key insight from the original Open SWE: it forces the agent
-    # to ALWAYS call a tool on every turn, preventing early JSON-only returns.
-    _use_default_tools = uses_default_tools(skill_id)
-
+    # Ensure agent always calls a tool (prevents early JSON-only returns)
     if _use_default_tools:
         from agent.middleware.ensure_no_empty_msg import ensure_no_empty_msg
 
-        middleware.append(ensure_no_empty_msg)
-        logger.info("Added ensure_no_empty_msg middleware (forces tool usage)")
+        extra_middleware.append(ensure_no_empty_msg)
+
+    # SDK builds guardrail + rules + persona + skill middleware from manifest
+    # We pass our custom middleware via extra_middleware
+    from agent.config.manifest import _mi
+
+    middleware = create_middleware_stack(
+        _mi(),
+        copilotkit=False,
+        extra_middleware=extra_middleware,
+    )
+    logger.info(
+        "Middleware stack: %d layers (SDK + %d custom)", len(middleware), len(extra_middleware)
+    )
 
     with gh_group(f"Middleware stack ({len(middleware)} layers)"):
         logger.info("Creating agent with model=%s, middleware=%d", model_id, len(middleware))
