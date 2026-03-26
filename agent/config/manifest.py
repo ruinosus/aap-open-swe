@@ -102,6 +102,85 @@ def get_skill_instruction(skill_id: str) -> str | None:
     return skill.instruction if skill else None
 
 
+# ── Skill routing (from manifest metadata) ───
+def get_skills_by_category(category: str) -> list:
+    """Get all skills with the given category (review, pr, analysis, migration, utility)."""
+    return [s for s in _mi().skills() if getattr(s, "category", "") == category]
+
+
+def get_skill_category(skill_id: str) -> str:
+    """Get the category of a skill."""
+    skill = _mi().skill(skill_id)
+    return getattr(skill, "category", "") if skill else ""
+
+
+def get_skill_branch(skill_id: str) -> str:
+    """Get the branch pattern for a skill (empty string if no branch needed)."""
+    skill = _mi().skill(skill_id)
+    return getattr(skill, "branchPattern", "") if skill else ""
+
+
+def is_structured_output_skill(skill_id: str) -> bool:
+    """Check if a skill uses structured output (response_format)."""
+    skill = _mi().skill(skill_id)
+    return getattr(skill, "outputFormat", "") == "structured"
+
+
+def uses_default_tools(skill_id: str) -> bool:
+    """Check if a skill needs default tools (freeform output skills do)."""
+    skill = _mi().skill(skill_id)
+    fmt = getattr(skill, "outputFormat", "freeform")
+    return fmt == "freeform"
+
+
+# ── Git identity ─────────────────────────────
+def get_git_identity() -> tuple[str, str]:
+    """Returns (author_name, author_email) from spec.git."""
+    spec = _mi().manifest
+    git = {}
+    if hasattr(spec, "spec"):
+        git = getattr(spec.spec, "git", None) or {}
+        if not isinstance(git, dict):
+            git = {
+                "authorName": getattr(git, "authorName", ""),
+                "authorEmail": getattr(git, "authorEmail", ""),
+            }
+    return (
+        git.get("authorName", "open-swe[bot]"),
+        git.get("authorEmail", "open-swe@users.noreply.github.com"),
+    )
+
+
+def get_default_branch_pattern() -> str:
+    """Get default branch pattern from spec.git."""
+    spec = _mi().manifest
+    git = {}
+    if hasattr(spec, "spec"):
+        git = getattr(spec.spec, "git", None) or {}
+        if not isinstance(git, dict):
+            git = {"defaultBranchPattern": getattr(git, "defaultBranchPattern", "")}
+    return git.get("defaultBranchPattern", "aap-open-swe/issue-{issue_number}")
+
+
+# ── Formatting constants ─────────────────────
+def get_formatting() -> dict:
+    """Get formatting constants (status icons, severity icons, layer icons)."""
+    spec = _mi().manifest
+    if hasattr(spec, "spec"):
+        fmt = getattr(spec.spec, "formatting", None)
+        if fmt:
+            return (
+                fmt
+                if isinstance(fmt, dict)
+                else {
+                    "statusIcons": getattr(fmt, "statusIcons", {}),
+                    "severityIcons": getattr(fmt, "severityIcons", {}),
+                    "layerIcons": getattr(fmt, "layerIcons", {}),
+                }
+            )
+    return {}
+
+
 # ── Rules ────────────────────────────────────
 def get_rules():
     return _mi().rules()
