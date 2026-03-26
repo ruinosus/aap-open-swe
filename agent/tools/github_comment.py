@@ -3,8 +3,8 @@ from typing import Any
 
 from langgraph.config import get_config
 
-from ..utils.github_app import get_github_app_installation_token
-from ..utils.github_comments import post_github_comment
+from ..github.app import get_github_app_installation_token
+from ..github.comments import post_github_comment
 
 
 def github_comment(message: str, issue_number: int) -> dict[str, Any]:

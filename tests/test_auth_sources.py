@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from agent.utils import auth
+from agent.github import auth
 
 
 def test_leave_failure_comment_posts_to_slack_thread(

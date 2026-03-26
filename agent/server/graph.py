@@ -47,7 +47,7 @@ from ..tools import (
     linear_comment,
     slack_thread_reply,
 )
-from ..utils.auth import resolve_github_token
+from ..github.auth import resolve_github_token
 from ..utils.model import make_model
 from ..utils.sandbox import create_sandbox
 from .prompt import construct_system_prompt
@@ -59,7 +59,7 @@ SANDBOX_CREATION_TIMEOUT = 180
 SANDBOX_POLL_INTERVAL = 1.0
 
 from ..utils.agents_md import read_agents_md_in_sandbox
-from ..utils.github import (
+from ..github.api import (
     _CRED_FILE_PATH,
     cleanup_git_credentials,
     git_has_uncommitted_changes,

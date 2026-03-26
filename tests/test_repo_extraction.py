@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agent.utils.repo import extract_repo_from_text
+from agent.github.repo import extract_repo_from_text
 
 
 class TestExtractRepoFromText:

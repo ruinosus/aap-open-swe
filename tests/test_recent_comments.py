@@ -1,4 +1,4 @@
-from agent.utils.comments import get_recent_comments
+from agent.github.comments import get_recent_comments
 
 
 def test_get_recent_comments_returns_none_for_empty() -> None:

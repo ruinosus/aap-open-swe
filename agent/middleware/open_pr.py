@@ -16,7 +16,7 @@ from langchain.agents.middleware import AgentState, after_agent
 from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
-from ..utils.github import (
+from ..github.api import (
     create_github_pr,
     get_github_default_branch,
     git_add_all,
@@ -29,7 +29,7 @@ from ..utils.github import (
     git_has_unpushed_commits,
     git_push,
 )
-from ..utils.github_token import get_github_token
+from ..github.app import get_github_token
 from ..utils.sandbox_paths import aresolve_repo_dir
 from ..utils.sandbox_state import get_sandbox_backend
 
