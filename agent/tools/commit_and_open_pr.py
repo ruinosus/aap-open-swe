@@ -159,11 +159,14 @@ def commit_and_open_pr(
                     "pr_url": None,
                 }
 
+        from ..config import get_git_identity
+
+        _git_name, _git_email = get_git_identity()
         git_config_user(
             sandbox_backend,
             repo_dir,
-            "open-swe[bot]",
-            "open-swe@users.noreply.github.com",
+            _git_name,
+            _git_email,
         )
         git_add_all(sandbox_backend, repo_dir)
 

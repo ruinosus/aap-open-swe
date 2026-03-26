@@ -1,0 +1,40 @@
+## Agent Execution Report
+
+**{{status_icon}} {{status}}** | **Duration:** {{duration}} | **Cost:** {{cost}}
+
+### Objective
+> {{objective}}
+
+### What was done
+{{summary}}
+
+{{#guardrail_suggestions}}
+
+**Suggested guardrails** ({{guardrail_count}}):
+{{#guardrail_suggestions}}
+- `{{name}}` — {{description}} ({{phase}}/{{action}})
+{{/guardrail_suggestions}}
+{{/guardrail_suggestions}}
+
+### Metrics
+| Metric | Value |
+|--------|-------|
+| **Skill** | `{{skill_id}}` |
+| **Model** | `{{model_id}}` |
+{{#llm_calls}}| LLM calls | {{llm_calls}} |
+{{/llm_calls}}{{#total_tokens}}| Input tokens | {{input_tokens}} |
+| Output tokens | {{output_tokens}} |
+| Total tokens | {{total_tokens}} |
+{{/total_tokens}}{{#tool_calls}}| Tool calls | {{tool_calls}} |
+{{/tool_calls}}| Duration | {{duration}} |
+{{#estimated_cost}}| **Estimated cost** | **{{estimated_cost}}** |
+{{/estimated_cost}}
+
+{{#raw_output}}
+<details>
+<summary>Raw agent output</summary>
+
+{{raw_output}}
+
+</details>
+{{/raw_output}}

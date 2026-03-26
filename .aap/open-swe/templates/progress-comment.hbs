@@ -1,0 +1,23 @@
+### Agent Execution
+
+| | |
+|---|---|
+{{#skill_id}}| **Skill** | `{{skill_id}}` |
+{{/skill_id}}{{#model_id}}| **Model** | `{{model_id}}` |
+{{/model_id}}| **Repo** | `{{repo_owner}}/{{repo_name}}` |
+| **Duration** | {{duration}} |
+
+{{progress_bar}}
+
+{{#has_usage}}
+#### Usage
+| Metric | Value |
+|--------|-------|
+{{#llm_calls}}| LLM calls | {{llm_calls}} |
+{{/llm_calls}}{{#input_tokens}}| Input tokens | {{input_tokens}} |
+| Output tokens | {{output_tokens}} |
+| Total tokens | {{total_tokens}} |
+{{/input_tokens}}{{#tool_calls}}| Tool calls | {{tool_calls}} |
+{{/tool_calls}}{{#estimated_cost}}| **Estimated cost** | **{{estimated_cost}}** |
+{{/estimated_cost}}
+{{/has_usage}}

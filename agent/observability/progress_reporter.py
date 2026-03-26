@@ -98,57 +98,51 @@ class ProgressReporter:
             self._post(final=True)
 
     def _format_progress(self, final: bool = False) -> str:
-        """Build the markdown progress comment."""
+        """Build the markdown progress comment from template."""
+        from agent.config import get_formatting
+        from agent.config.templates import render_template
+
         elapsed = int(time.time() - self._start_time)
         mins, secs = divmod(elapsed, 60)
+        total_tokens = self.input_tokens + self.output_tokens
 
-        status_icon = {
-            "pending": "\u2b1c",
-            "running": "\u23f3",
-            "done": "\u2705",
-            "failed": "\u274c",
-        }
+        # Icons from manifest
+        fmt = get_formatting()
+        status_icons = fmt.get("statusIcons", {}) if isinstance(fmt, dict) else {}
 
-        lines = ["### Agent Execution\n"]
-
-        # Context table
-        lines.append("| | |")
-        lines.append("|---|---|")
-        if self.skill_id:
-            lines.append(f"| **Skill** | `{self.skill_id}` |")
-        if self.model_id:
-            lines.append(f"| **Model** | `{self.model_id}` |")
-        lines.append(f"| **Repo** | `{self.repo_owner}/{self.repo_name}` |")
-        lines.append(f"| **Duration** | {mins}m{secs:02d}s |")
-        lines.append("")
-
-        # Progress bar
+        # Build progress bar
         bar_parts = []
         for p in self._phases:
-            icon = status_icon.get(p["status"], "\u2b1c")
+            icon = status_icons.get(
+                {
+                    "pending": "pending",
+                    "running": "running",
+                    "done": "success",
+                    "failed": "failure",
+                }.get(p["status"], "pending"),
+                "\u2b1c",
+            )
             bar_parts.append(f"{icon} {p['name']}")
-        if bar_parts:
-            lines.append(" | ".join(bar_parts))
-            lines.append("")
 
-        # Usage table
-        total_tokens = self.input_tokens + self.output_tokens
-        if total_tokens > 0 or self._tool_calls > 0:
-            lines.append("#### Usage")
-            lines.append("| Metric | Value |")
-            lines.append("|--------|-------|")
-            if self.llm_calls:
-                lines.append(f"| LLM calls | {self.llm_calls} |")
-            if total_tokens > 0:
-                lines.append(f"| Input tokens | {self.input_tokens:,} |")
-                lines.append(f"| Output tokens | {self.output_tokens:,} |")
-                lines.append(f"| Total tokens | {total_tokens:,} |")
-            if self._tool_calls:
-                lines.append(f"| Tool calls | {self._tool_calls} |")
-            if self.estimated_cost is not None:
-                lines.append(f"| **Estimated cost** | **${self.estimated_cost:.4f}** |")
+        template_data = {
+            "skill_id": self.skill_id,
+            "model_id": self.model_id,
+            "repo_owner": self.repo_owner,
+            "repo_name": self.repo_name,
+            "duration": f"{mins}m{secs:02d}s",
+            "progress_bar": " | ".join(bar_parts) if bar_parts else "",
+            "has_usage": total_tokens > 0 or self._tool_calls > 0,
+            "llm_calls": self.llm_calls,
+            "input_tokens": f"{self.input_tokens:,}" if self.input_tokens else "",
+            "output_tokens": f"{self.output_tokens:,}" if self.output_tokens else "",
+            "total_tokens": f"{total_tokens:,}" if total_tokens else "",
+            "tool_calls": self._tool_calls,
+            "estimated_cost": f"${self.estimated_cost:.4f}"
+            if self.estimated_cost is not None
+            else "",
+        }
 
-        return "\n".join(lines)
+        return render_template("progressComment", template_data) or ""
 
     def _post_body(self, body: str) -> None:
         """Post or edit a comment with the given body text."""

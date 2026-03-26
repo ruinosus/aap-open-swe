@@ -4,20 +4,25 @@ import json
 import re
 import time
 
-# Patterns to redact from public output
-_SECRET_PATTERNS = [
-    (r"(sk-[a-zA-Z0-9\-]{20,})", "[REDACTED_KEY]"),
-    (r"(ghp_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
-    (r"(ghs_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
-    (r"(AKIA[0-9A-Z]{16})", "[REDACTED_AWS]"),
-    (r"(Bearer\s+[a-zA-Z0-9\-._~+/]+=*)", "[REDACTED_BEARER]"),
-    (r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}['\"]", r"\1=[REDACTED]"),
-]
+from agent.config import get_formatting, get_skill
+from agent.config.templates import render_template
 
 
 def _redact_secrets(text: str) -> str:
     """Redact potential secrets from text before embedding in public comments."""
-    for pattern, replacement in _SECRET_PATTERNS:
+    # Patterns from the secret-redaction guardrail manifest
+    patterns = [
+        (r"(sk-[a-zA-Z0-9\-]{20,})", "[REDACTED_KEY]"),
+        (r"(ghp_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
+        (r"(ghs_[a-zA-Z0-9]{36})", "[REDACTED_TOKEN]"),
+        (r"(AKIA[0-9A-Z]{16})", "[REDACTED_AWS]"),
+        (r"(Bearer\s+[a-zA-Z0-9\-._~+/]+=*)", "[REDACTED_BEARER]"),
+        (
+            r"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['\"][^'\"]{8,}['\"]",
+            r"\1=[REDACTED]",
+        ),
+    ]
+    for pattern, replacement in patterns:
         text = re.sub(pattern, replacement, text)
     return text
 
@@ -41,97 +46,69 @@ def build_execution_report(
     pr_url: str = "",
     success: bool = True,
 ) -> str:
-    """Build a markdown execution report for the GitHub issue comment.
-
-    This replaces raw agent output with a structured report that answers:
-    - What was the objective?
-    - What did the agent do?
-    - Was it successful?
-    - How much did it cost?
-    """
+    """Build a markdown execution report."""
     elapsed = int(time.time() - start_time)
     mins, secs = divmod(elapsed, 60)
     duration = f"{mins}m{secs:02d}s"
     total_tokens = input_tokens + output_tokens
     cost_str = f"${estimated_cost:.4f}" if estimated_cost is not None else "N/A"
 
-    # Status
+    # Icons from manifest
+    fmt = get_formatting()
+    status_icons = fmt.get("statusIcons", {}) if isinstance(fmt, dict) else {}
+
     if success:
         status = "Success" if has_changes else "Success (no changes)"
-        status_icon = "\u2705"
+        status_icon = status_icons.get("success", "\u2705")
     else:
         status = "Failed"
-        status_icon = "\u274c"
+        status_icon = status_icons.get("failure", "\u274c")
 
-    lines = [
-        "## Agent Execution Report",
-        "",
-        f"**{status_icon} {status}** | **Duration:** {duration} | **Cost:** {cost_str}",
-        "",
-    ]
+    # Objective from manifest skill description
+    objective = _extract_objective(task, skill_id, repo_owner, repo_name)
 
-    # Objective section — show the original task
-    task_preview = _extract_objective(task, skill_id, repo_owner, repo_name, issue_number)
-    lines.append("### Objective")
-    lines.append(f"> {task_preview}")
-    lines.append("")
-
-    # What was done — extract from agent response
+    # Summary from agent response
     summary = _extract_summary(agent_response, skill_id, has_changes, branch_name, pr_url)
-    lines.append("### What was done")
-    lines.append(summary)
-    lines.append("")
 
-    # Metrics table
-    lines.append("### Metrics")
-    lines.append("| Metric | Value |")
-    lines.append("|--------|-------|")
-    lines.append(f"| **Skill** | `{skill_id or 'swe-coder'}` |")
-    lines.append(f"| **Model** | `{model_id}` |")
-    if llm_calls:
-        lines.append(f"| LLM calls | {llm_calls} |")
-    if total_tokens:
-        lines.append(f"| Input tokens | {input_tokens:,} |")
-        lines.append(f"| Output tokens | {output_tokens:,} |")
-        lines.append(f"| Total tokens | {total_tokens:,} |")
-    if tool_calls:
-        lines.append(f"| Tool calls | {tool_calls} |")
-    lines.append(f"| Duration | {duration} |")
-    if estimated_cost is not None:
-        lines.append(f"| **Estimated cost** | **{cost_str}** |")
-    lines.append("")
+    # Guardrail suggestions from parsed response
+    guardrail_suggestions = []
+    try:
+        parsed = json.loads(agent_response) if agent_response else None
+        if parsed and isinstance(parsed, dict):
+            guardrail_suggestions = parsed.get("suggested_guardrails", [])
+    except (json.JSONDecodeError, TypeError):
+        pass
 
-    # Agent output in collapsible details (redact potential secrets)
-    if agent_response:
-        safe_output = _redact_secrets(agent_response[:5000])
-        lines.append("<details>")
-        lines.append("<summary>Raw agent output</summary>")
-        lines.append("")
-        lines.append(safe_output)
-        lines.append("")
-        lines.append("</details>")
-
-    return "\n".join(lines)
-
-
-def _extract_objective(
-    task: str, skill_id: str, repo_owner: str, repo_name: str, issue_number: int
-) -> str:
-    """Extract a clean objective from the task string."""
-    skill_descriptions = {
-        "code-review": f"Review PR #{issue_number} on `{repo_owner}/{repo_name}` for code quality and correctness",
-        "security-scan": f"Security scan PR #{issue_number} on `{repo_owner}/{repo_name}` for vulnerabilities",
-        "aap-sizing": f"Analyze `{repo_owner}/{repo_name}` for AAP SDK migration sizing",
-        "migrate-to-aap": f"Migrate `{repo_owner}/{repo_name}` to AAP SDK manifest architecture (Layers 1-6)",
-        "doc-generator": f"Generate documentation for `{repo_owner}/{repo_name}`",
-        "test-generator": f"Generate tests for `{repo_owner}/{repo_name}`",
-        "project-docs": f"Generate project documentation for `{repo_owner}/{repo_name}`",
+    # Render template
+    template_data = {
+        "status_icon": status_icon,
+        "status": status,
+        "duration": duration,
+        "cost": cost_str,
+        "objective": objective,
+        "summary": summary,
+        "skill_id": skill_id or "swe-coder",
+        "model_id": model_id,
+        "llm_calls": llm_calls,
+        "input_tokens": f"{input_tokens:,}" if input_tokens else "",
+        "output_tokens": f"{output_tokens:,}" if output_tokens else "",
+        "total_tokens": f"{total_tokens:,}" if total_tokens else "",
+        "tool_calls": tool_calls,
+        "estimated_cost": cost_str if estimated_cost is not None else "",
+        "raw_output": _redact_secrets(agent_response[:5000]) if agent_response else "",
+        "guardrail_suggestions": guardrail_suggestions,
+        "guardrail_count": len(guardrail_suggestions),
     }
 
-    if skill_id in skill_descriptions:
-        return skill_descriptions[skill_id]
+    return render_template("executionReport", template_data) or ""
 
-    # Fallback: first line of task, cleaned up
+
+def _extract_objective(task: str, skill_id: str, repo_owner: str, repo_name: str) -> str:
+    """Extract objective from manifest skill description."""
+    skill = get_skill(skill_id)
+    if skill and getattr(skill, "description", ""):
+        return f"{skill.description} on `{repo_owner}/{repo_name}`"
+
     first_line = task.split("\n")[0][:200].strip()
     if first_line.startswith("Issue #"):
         return first_line
@@ -145,8 +122,7 @@ def _extract_summary(
     branch_name: str,
     pr_url: str,
 ) -> str:
-    """Extract a human-readable summary of what the agent did."""
-    # Try to parse structured output
+    """Extract summary from agent response."""
     data = None
     try:
         data = json.loads(agent_response)
@@ -159,7 +135,7 @@ def _extract_summary(
         if output_type == "review":
             comments = data.get("comments", [])
             score = data.get("score", "N/A")
-            summary = data.get("summary", "")
+            summary_text = data.get("summary", "")
             guardrails = data.get("suggested_guardrails", [])
             severities = {}
             for c in comments:
@@ -171,17 +147,15 @@ def _extract_summary(
                 f"- Found **{len(comments)} findings** ({sev_str})"
                 if comments
                 else "- No findings",
-                f"- {summary}" if summary else "",
+                f"- {summary_text}" if summary_text else "",
             ]
             if guardrails:
                 lines.append("")
                 lines.append(f"**Suggested guardrails** ({len(guardrails)}):")
                 for g in guardrails:
-                    name = g.get("name", "unknown")
-                    desc = g.get("description", "")
-                    phase = g.get("phase", "input")
-                    action = g.get("action", "block")
-                    lines.append(f"- `{name}` — {desc} ({phase}/{action})")
+                    lines.append(
+                        f"- `{g.get('name', '?')}` — {g.get('description', '')} ({g.get('phase', 'input')}/{g.get('action', 'block')})"
+                    )
             return "\n".join(line for line in lines if line)
 
         if output_type == "sizing":
@@ -201,12 +175,12 @@ def _extract_summary(
 
         if output_type == "migration":
             layer = data.get("layer", 0)
-            summary = data.get("summary", "")
+            summary_text = data.get("summary", "")
             files_created = data.get("files_created", [])
             files_modified = data.get("files_modified", [])
             lines = [
                 f"- Completed **Layer {layer}** migration",
-                f"- {summary}" if summary else "",
+                f"- {summary_text}" if summary_text else "",
                 f"- Created {len(files_created)} files, modified {len(files_modified)} files"
                 if files_created or files_modified
                 else "",
@@ -218,10 +192,10 @@ def _extract_summary(
             return "\n".join(line for line in lines if line)
 
         if output_type == "pr":
-            summary = data.get("summary", "")
+            summary_text = data.get("summary", "")
             files = data.get("files_changed", [])
             lines = [
-                f"- {summary}" if summary else "- Generated changes",
+                f"- {summary_text}" if summary_text else "- Generated changes",
                 f"- Changed {len(files)} files" if files else "",
             ]
             if branch_name:
@@ -230,7 +204,6 @@ def _extract_summary(
                 lines.append(f"- PR: {pr_url}")
             return "\n".join(line for line in lines if line)
 
-    # Fallback for unstructured responses
     if has_changes:
         lines = ["- Agent made changes and pushed to branch"]
         if branch_name:
@@ -239,6 +212,5 @@ def _extract_summary(
             lines.append(f"- PR: {pr_url}")
         return "\n".join(lines)
 
-    # Last resort: first 200 chars of response
     preview = agent_response[:200].replace("\n", " ").strip()
     return f"- {preview}" if preview else "- Agent completed without making changes"

@@ -1,0 +1,52 @@
+## {{layer_icon_1}} AAP SDK Migration — Sizing Report
+
+| Metric | Value |
+|--------|-------|
+| **Repository** | {{repo_url}} |
+| **Type** | {{repo_type_label}} |
+| **Languages** | {{languages}} |
+| **Total Findings** | **{{total_findings}}** |
+
+{{#layers}}
+### Layers
+
+| Layer | Name | Findings | Breaking? |
+|-------|------|----------|-----------|
+{{#layers}}
+| {{icon}} {{layer}} | **{{name}}** | {{count}} | {{breaking_label}} |
+{{/layers}}
+{{/layers}}
+
+{{#findings}}
+<details>
+<summary>{{findings_icon}} Detailed Findings ({{findings_count}})</summary>
+
+| # | Layer | Impact | File | Description |
+|---|-------|--------|------|-------------|
+{{#findings}}
+| {{index}} | L{{layer}} | {{impact_icon}} {{impact}} | `{{file}}` | {{description}} |
+{{/findings}}
+
+</details>
+{{/findings}}
+
+{{#proposed_structure}}
+<details>
+<summary>{{folder_icon}} Proposed .aap/ Structure ({{structure_count}} files)</summary>
+
+```
+{{#proposed_structure}}
+{{.}}
+{{/proposed_structure}}
+```
+
+</details>
+{{/proposed_structure}}
+
+### Next Steps
+
+```
+{{#next_steps}}
+{{.}}
+{{/next_steps}}
+```

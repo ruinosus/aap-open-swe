@@ -92,7 +92,11 @@ def parse_review_output(agent_response: str) -> dict | None:
 
 def format_review_summary(review: dict, skill_id: str) -> str:
     """Format review data as a markdown summary comment."""
-    skill_name = "Code Review" if skill_id == "code-review" else "Security Scan"
+    from agent.config import get_manifest, get_skill
+    from agent.config.templates import render_template
+
+    skill_obj = get_skill(skill_id)
+    skill_name = skill_obj.name if skill_obj else skill_id
     score = review.get("score", "N/A")
     summary = review.get("summary", "No summary provided.")
     comments = review.get("comments", [])
@@ -105,17 +109,28 @@ def format_review_summary(review: dict, skill_id: str) -> str:
 
     severity_line = " | ".join(f"**{k}**: {v}" for k, v in sorted(severities.items()))
 
-    md = f"### AAP Open SWE — {skill_name}\n\n"
-    md += f"**Score:** {score}\n\n"
-    md += f"{summary}\n\n"
-    if severity_line:
-        md += f"**Findings:** {severity_line}\n\n"
-    if comments:
-        md += f"**{len(comments)} inline comment(s)** posted on this PR.\n"
-    else:
-        md += "No issues found.\n"
+    manifest = get_manifest()
+    module_name = "AAP Open SWE"
+    if manifest and hasattr(manifest, "metadata"):
+        meta = manifest.metadata
+        module_name = (
+            getattr(meta, "displayName", None) or getattr(meta, "display_name", None) or module_name
+        )
 
-    return md
+    # Try template rendering first
+    rendered = render_template(
+        "reviewSummary",
+        {
+            "module_name": module_name,
+            "skill_name": skill_name,
+            "score": score,
+            "summary": summary,
+            "severity_line": severity_line,
+            "comment_count": len(comments) if comments else 0,
+        },
+    )
+
+    return rendered or ""
 
 
 def post_pr_review(

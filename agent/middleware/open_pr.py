@@ -130,12 +130,15 @@ async def open_pr_if_needed(
                     git_checkout_branch, sandbox_backend, repo_dir, target_branch
                 )
 
+        from ..config import get_git_identity
+
+        _git_name, _git_email = get_git_identity()
         await asyncio.to_thread(
             git_config_user,
             sandbox_backend,
             repo_dir,
-            "open-swe[bot]",
-            "open-swe@users.noreply.github.com",
+            _git_name,
+            _git_email,
         )
         await asyncio.to_thread(git_add_all, sandbox_backend, repo_dir)
         await asyncio.to_thread(git_commit, sandbox_backend, repo_dir, commit_message)
