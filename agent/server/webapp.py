@@ -14,7 +14,7 @@ from langchain_core.messages.content import create_text_block
 from langgraph_sdk import get_client
 from langgraph_sdk.client import LangGraphClient
 
-from ..aap_config import (
+from ..config import (
     get_allowed_github_orgs,
     get_default_repo_name,
     get_default_repo_owner,

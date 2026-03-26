@@ -10,7 +10,6 @@ from .manifest import (  # noqa: F401
     get_langgraph_url,
     get_linear_team_to_repo,
     get_manifest,
-    get_model_config,
     get_model_id,
     get_model_max_tokens,
     get_model_temperature,
@@ -22,6 +21,8 @@ from .manifest import (  # noqa: F401
     get_skills,
     get_slack_bot_user_id,
     get_slack_bot_username,
+    get_slack_repo_name,
+    get_slack_repo_owner,
     get_telemetry_service_name,
     is_telemetry_enabled,
 )

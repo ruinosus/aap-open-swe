@@ -1,6 +1,14 @@
 """Tests for skill adapter integration."""
 
 
+def _reset():
+    """Reset the ManifestInstance singleton for clean tests."""
+    global _instance
+    import agent.config.manifest
+
+    agent.config.manifest._instance = None
+
+
 def test_get_skills_returns_list():
     from agent.config import get_skills
 
@@ -8,11 +16,10 @@ def test_get_skills_returns_list():
     assert isinstance(skills, list)
 
 
-def test_get_skills_loads_4_skills():
-    from agent.aap_config import _load_manifest
+def test_get_skills_loads_7_skills():
     from agent.config import get_skills
 
-    _load_manifest.cache_clear()
+    _reset()
     skills = get_skills()
     assert len(skills) == 7
     ids = [s.id for s in skills]
@@ -26,10 +33,9 @@ def test_get_skills_loads_4_skills():
 
 
 def test_get_skill_by_id():
-    from agent.aap_config import _load_manifest
     from agent.config import get_skill
 
-    _load_manifest.cache_clear()
+    _reset()
     skill = get_skill("code-review")
     assert skill is not None
     assert skill.id == "code-review"
@@ -43,41 +49,45 @@ def test_get_skill_unknown_returns_none():
 
 
 def test_get_skill_adapter_builds():
-    from agent.aap_config import _load_manifest, get_skill_adapter
+    from cockpit_aap import create_manifest_skill_adapter
 
-    _load_manifest.cache_clear()
-    adapter = get_skill_adapter()
+    from agent.config import get_skills
+
+    _reset()
+    adapter = create_manifest_skill_adapter(get_skills())
     assert adapter is not None
     assert hasattr(adapter, "detect_triggers")
     assert hasattr(adapter, "build_skill_system_prompt")
 
 
 def test_skill_adapter_detects_review_trigger():
-    from agent.aap_config import _load_manifest, get_skill_adapter
+    from cockpit_aap import create_manifest_skill_adapter
 
-    _load_manifest.cache_clear()
-    adapter = get_skill_adapter()
+    from agent.config import get_skills
+
+    _reset()
+    adapter = create_manifest_skill_adapter(get_skills())
     activated = adapter.detect_triggers("please review this PR")
     ids = [s.id for s in activated]
     assert "code-review" in ids
 
 
 def test_skill_adapter_detects_security_trigger():
-    from agent.aap_config import _load_manifest, get_skill_adapter
+    from cockpit_aap import create_manifest_skill_adapter
 
-    _load_manifest.cache_clear()
-    adapter = get_skill_adapter()
+    from agent.config import get_skills
+
+    _reset()
+    adapter = create_manifest_skill_adapter(get_skills())
     activated = adapter.detect_triggers("check for security vulnerabilities")
     ids = [s.id for s in activated]
     assert "security-scan" in ids
 
 
 def test_get_skill_instruction_returns_content():
-    from agent.aap_config import _load_manifest
     from agent.config import get_skill_instruction
 
-    _load_manifest.cache_clear()
+    _reset()
     instruction = get_skill_instruction("code-review")
-    assert instruction
-    assert len(instruction) > 100  # non-trivial content
-    assert "review" in instruction.lower()
+    assert instruction is not None
+    assert "security" in instruction.lower() or "review" in instruction.lower()

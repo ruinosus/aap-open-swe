@@ -47,11 +47,10 @@ async def test_review_skill_with_sdk_guardrails():
     from deepagents.backends import LocalShellBackend
     from langchain.agents.structured_output import ProviderStrategy
 
-    from agent.aap_config import get_manifest
+    from agent.config import get_manifest, make_model
     from agent.middleware.output_validator import create_output_validator
     from agent.skills.review.poster import parse_review_output
     from agent.skills.schemas import ReviewOutput
-    from agent.utils.model import make_model
 
     model_id = _get_model_id()
     model = make_model(model_id, temperature=0, max_tokens=4000)

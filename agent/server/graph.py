@@ -26,7 +26,7 @@ from deepagents import create_deep_agent
 from deepagents.backends.protocol import SandboxBackendProtocol
 from langsmith.sandbox import SandboxClientError
 
-from ..aap_config import (
+from ..config import (
     get_agent_instruction,
     get_model_id,
     get_model_max_tokens,
