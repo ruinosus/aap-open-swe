@@ -63,6 +63,49 @@ def build_execution_report(
         status = "Failed"
         status_icon = "\u274c"
 
+    # Objective section — show the original task
+    task_preview = _extract_objective(task, skill_id, repo_owner, repo_name, issue_number)
+
+    # What was done — extract from agent response
+    summary = _extract_summary(agent_response, skill_id, has_changes, branch_name, pr_url)
+
+    # Build guardrail suggestions from parsed agent response
+    guardrail_suggestions = []
+    try:
+        parsed = json.loads(agent_response) if agent_response else None
+        if parsed and isinstance(parsed, dict):
+            guardrail_suggestions = parsed.get("suggested_guardrails", [])
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Try template rendering first
+    from agent.config.templates import render_template
+
+    template_data = {
+        "status_icon": status_icon,
+        "status": status,
+        "duration": duration,
+        "cost": cost_str,
+        "objective": task_preview,
+        "summary": summary,
+        "skill_id": skill_id or "swe-coder",
+        "model_id": model_id,
+        "llm_calls": llm_calls,
+        "input_tokens": f"{input_tokens:,}" if input_tokens else "",
+        "output_tokens": f"{output_tokens:,}" if output_tokens else "",
+        "total_tokens": f"{total_tokens:,}" if total_tokens else "",
+        "tool_calls": tool_calls,
+        "estimated_cost": cost_str if estimated_cost is not None else "",
+        "raw_output": _redact_secrets(agent_response[:5000]) if agent_response else "",
+        "guardrail_suggestions": guardrail_suggestions,
+        "guardrail_count": len(guardrail_suggestions),
+    }
+
+    rendered = render_template("executionReport", template_data)
+    if rendered:
+        return rendered
+
+    # Fallback to Python formatting
     lines = [
         "## Agent Execution Report",
         "",
@@ -70,14 +113,10 @@ def build_execution_report(
         "",
     ]
 
-    # Objective section — show the original task
-    task_preview = _extract_objective(task, skill_id, repo_owner, repo_name, issue_number)
     lines.append("### Objective")
     lines.append(f"> {task_preview}")
     lines.append("")
 
-    # What was done — extract from agent response
-    summary = _extract_summary(agent_response, skill_id, has_changes, branch_name, pr_url)
     lines.append("### What was done")
     lines.append(summary)
     lines.append("")

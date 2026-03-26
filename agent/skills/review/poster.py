@@ -93,6 +93,7 @@ def parse_review_output(agent_response: str) -> dict | None:
 def format_review_summary(review: dict, skill_id: str) -> str:
     """Format review data as a markdown summary comment."""
     from agent.config import get_manifest, get_skill
+    from agent.config.templates import render_template
 
     skill_obj = get_skill(skill_id)
     skill_name = skill_obj.name if skill_obj else skill_id
@@ -115,6 +116,23 @@ def format_review_summary(review: dict, skill_id: str) -> str:
         module_name = (
             getattr(meta, "displayName", None) or getattr(meta, "display_name", None) or module_name
         )
+
+    # Try template rendering first
+    rendered = render_template(
+        "reviewSummary",
+        {
+            "module_name": module_name,
+            "skill_name": skill_name,
+            "score": score,
+            "summary": summary,
+            "severity_line": severity_line,
+            "comment_count": len(comments) if comments else 0,
+        },
+    )
+    if rendered:
+        return rendered
+
+    # Fallback to Python formatting
     md = f"### {module_name} — {skill_name}\n\n"
     md += f"**Score:** {score}\n\n"
     md += f"{summary}\n\n"
