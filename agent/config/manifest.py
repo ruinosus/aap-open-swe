@@ -81,8 +81,75 @@ def get_model_max_tokens() -> int:
 
 
 # ── Agent ────────────────────────────────────
-def get_agent_instruction(agent_id: str = "swe-coder") -> str | None:
-    return _mi().agent_instruction(agent_id)
+def get_default_agent_id() -> str:
+    return _artifact("open-swe.config.default_agent_id", default="swe-coder")
+
+
+def get_agent_instruction(agent_id: str = "") -> str | None:
+    return _mi().agent_instruction(agent_id or get_default_agent_id())
+
+
+# ── Numeric limits ───────────────────────────
+def get_output_truncation_limit() -> int:
+    return int(_artifact("open-swe.config.output_truncation_limit", default="60000"))
+
+
+def get_tool_output_truncation() -> int:
+    return int(_artifact("open-swe.config.tool_output_truncation", default="500"))
+
+
+def get_http_timeout() -> int:
+    return int(_artifact("open-swe.config.http_timeout", default="10"))
+
+
+def get_pagination_limit() -> int:
+    return int(_artifact("open-swe.config.pagination_limit", default="100"))
+
+
+def get_tool_call_log_frequency() -> int:
+    return int(_artifact("open-swe.config.tool_call_log_frequency", default="5"))
+
+
+def get_pricing_api_url() -> str:
+    return _artifact("open-swe.config.pricing_api_url", default="https://models.dev/api.json")
+
+
+def get_temp_path_prefix() -> str:
+    return _artifact("open-swe.config.temp_path_prefix", default="/tmp/aap-sizing-target/")
+
+
+def get_default_bot_login() -> str:
+    return _artifact("open-swe.config.default_bot_login", default="github-actions")
+
+
+def get_commit_message_template() -> str:
+    return _artifact(
+        "open-swe.config.commit_message_template", default="fix: address issue #{issue_number}"
+    )
+
+
+# ── Reply messages ───────────────────────────
+def get_message(key: str, default: str = "") -> str:
+    return _artifact(f"open-swe.messages.{key}", default=default)
+
+
+# ── Module identity ──────────────────────────
+def get_module_name() -> str:
+    m = _mi().manifest
+    if m and hasattr(m, "metadata"):
+        return getattr(m.metadata, "name", "open-swe")
+    return "open-swe"
+
+
+def get_module_display_name() -> str:
+    m = _mi().manifest
+    if m and hasattr(m, "metadata"):
+        return (
+            getattr(m.metadata, "displayName", None)
+            or getattr(m.metadata, "display_name", None)
+            or "AAP Open SWE"
+        )
+    return "AAP Open SWE"
 
 
 # ── Skills ───────────────────────────────────
