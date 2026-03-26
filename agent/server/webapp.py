@@ -334,6 +334,16 @@ async def _upsert_slack_thread_repo_metadata(
 async def check_if_using_repo_msg_sent(
     channel_id: str, thread_ts: str, using_repo_str: str
 ) -> bool:
+    """Check whether a Slack thread already contains the repo-usage notice.
+
+    Args:
+        channel_id: Slack channel identifier.
+        thread_ts: Root thread timestamp.
+        using_repo_str: Message fragment that identifies the repo-usage notice.
+
+    Returns:
+        True if the notice is already present in the thread, otherwise False.
+    """
     thread_messages = await fetch_slack_thread_messages(channel_id, thread_ts)
     for message in thread_messages:
         if using_repo_str in message.get("text", ""):
@@ -1106,6 +1116,14 @@ _SUPPORTED_GH_ISSUE_ACTIONS = frozenset(["edited", "opened", "reopened"])
 
 
 def _build_github_issue_comments_text(comments: list[dict[str, Any]]) -> str:
+    """Build a prompt-ready text block from GitHub issue comments.
+
+    Args:
+        comments: GitHub issue comments to include in the prompt.
+
+    Returns:
+        A formatted text block, or a placeholder when no comments exist.
+    """
     lines: list[str] = []
     for comment in comments:
         body = comment.get("body", "")

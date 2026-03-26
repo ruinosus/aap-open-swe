@@ -50,6 +50,15 @@ def verify_github_signature(body: bytes, signature: str, *, secret: str) -> bool
 
 
 def get_thread_id_from_branch(branch_name: str) -> str | None:
+    """Extract the UUID thread ID embedded in a branch name.
+
+    Args:
+        branch_name: Git branch name that may contain an Open SWE thread UUID.
+
+    Returns:
+        The UUID string if present, otherwise None.
+    """
+def get_thread_id_from_branch(branch_name: str) -> str | None:
     match = re.search(
         r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
         branch_name,
@@ -85,6 +94,28 @@ def format_github_comment_body_for_prompt(author: str, body: str) -> str:
     )
 
 
+async def react_to_github_comment(
+    repo_config: dict[str, str],
+    comment_id: int,
+    *,
+    event_type: str,
+    token: str,
+    pull_number: int | None = None,
+    node_id: str | None = None,
+) -> bool:
+    """React to a GitHub comment or review with an 👀 reaction.
+
+    Args:
+        repo_config: Repository owner/name mapping.
+        comment_id: GitHub comment ID.
+        event_type: Webhook event type determining the reaction endpoint.
+        token: GitHub access token.
+        pull_number: Pull request number for review comments when needed.
+        node_id: GraphQL node ID for PR review bodies.
+
+    Returns:
+        True if the reaction was created or already existed, otherwise False.
+    """
 async def react_to_github_comment(
     repo_config: dict[str, str],
     comment_id: int,
