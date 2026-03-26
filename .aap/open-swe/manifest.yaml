@@ -178,6 +178,81 @@ spec:
 
   # ─── Artifacts (Configuration) ─────────────────────────────
   artifacts:
+    # Skill routing metadata (workaround until SDK supports custom skill fields)
+    # See: docs/superpowers/specs/2026-03-26-aap-sdk-skill-extensions.md
+    - key: open-swe.skills.code-review.category
+      category: skills
+      defaultValue: review
+    - key: open-swe.skills.code-review.outputFormat
+      category: skills
+      defaultValue: structured
+    - key: open-swe.skills.code-review.branchPattern
+      category: skills
+      defaultValue: ''
+    - key: open-swe.skills.security-scan.category
+      category: skills
+      defaultValue: review
+    - key: open-swe.skills.security-scan.outputFormat
+      category: skills
+      defaultValue: structured
+    - key: open-swe.skills.security-scan.branchPattern
+      category: skills
+      defaultValue: ''
+    - key: open-swe.skills.doc-generator.category
+      category: skills
+      defaultValue: pr
+    - key: open-swe.skills.doc-generator.outputFormat
+      category: skills
+      defaultValue: freeform
+    - key: open-swe.skills.doc-generator.branchPattern
+      category: skills
+      defaultValue: ''
+    - key: open-swe.skills.project-docs.category
+      category: skills
+      defaultValue: pr
+    - key: open-swe.skills.project-docs.outputFormat
+      category: skills
+      defaultValue: freeform
+    - key: open-swe.skills.project-docs.branchPattern
+      category: skills
+      defaultValue: ''
+    - key: open-swe.skills.test-generator.category
+      category: skills
+      defaultValue: pr
+    - key: open-swe.skills.test-generator.outputFormat
+      category: skills
+      defaultValue: freeform
+    - key: open-swe.skills.test-generator.branchPattern
+      category: skills
+      defaultValue: ''
+    - key: open-swe.skills.aap-sizing.category
+      category: skills
+      defaultValue: analysis
+    - key: open-swe.skills.aap-sizing.outputFormat
+      category: skills
+      defaultValue: freeform
+    - key: open-swe.skills.aap-sizing.branchPattern
+      category: skills
+      defaultValue: aap-migration/sizing
+    - key: open-swe.skills.migrate-to-aap.category
+      category: skills
+      defaultValue: migration
+    - key: open-swe.skills.migrate-to-aap.outputFormat
+      category: skills
+      defaultValue: freeform
+    - key: open-swe.skills.migrate-to-aap.branchPattern
+      category: skills
+      defaultValue: aap-migration/full
+    - key: open-swe.skills.respond-review.category
+      category: skills
+      defaultValue: utility
+    - key: open-swe.skills.respond-review.outputFormat
+      category: skills
+      defaultValue: none
+    - key: open-swe.skills.respond-review.branchPattern
+      category: skills
+      defaultValue: ''
+
     # Model configuration
     - key: open-swe.config.model
       category: configuration

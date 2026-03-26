@@ -102,34 +102,40 @@ def get_skill_instruction(skill_id: str) -> str | None:
     return skill.instruction if skill else None
 
 
-# ── Skill routing (from manifest metadata) ───
+# ── Skill routing (from manifest artifacts) ──
+# SDK v0.6.0 ManifestSkill doesn't expose custom fields (category, outputFormat,
+# branchPattern). We store these as artifacts until SDK supports them natively.
+# See: docs/superpowers/specs/2026-03-26-aap-sdk-skill-extensions.md
+
+
+def _skill_meta(skill_id: str, field: str, default: str = "") -> str:
+    """Read skill metadata from artifacts: open-swe.skills.{skill_id}.{field}."""
+    return _artifact(f"open-swe.skills.{skill_id}.{field}", default=default)
+
+
 def get_skills_by_category(category: str) -> list:
     """Get all skills with the given category (review, pr, analysis, migration, utility)."""
-    return [s for s in _mi().skills() if getattr(s, "category", "") == category]
+    return [s for s in _mi().skills() if _skill_meta(s.id, "category") == category]
 
 
 def get_skill_category(skill_id: str) -> str:
     """Get the category of a skill."""
-    skill = _mi().skill(skill_id)
-    return getattr(skill, "category", "") if skill else ""
+    return _skill_meta(skill_id, "category")
 
 
 def get_skill_branch(skill_id: str) -> str:
     """Get the branch pattern for a skill (empty string if no branch needed)."""
-    skill = _mi().skill(skill_id)
-    return getattr(skill, "branchPattern", "") if skill else ""
+    return _skill_meta(skill_id, "branchPattern")
 
 
 def is_structured_output_skill(skill_id: str) -> bool:
     """Check if a skill uses structured output (response_format)."""
-    skill = _mi().skill(skill_id)
-    return getattr(skill, "outputFormat", "") == "structured"
+    return _skill_meta(skill_id, "outputFormat") == "structured"
 
 
 def uses_default_tools(skill_id: str) -> bool:
     """Check if a skill needs default tools (freeform output skills do)."""
-    skill = _mi().skill(skill_id)
-    fmt = getattr(skill, "outputFormat", "freeform")
+    fmt = _skill_meta(skill_id, "outputFormat", "freeform")
     return fmt == "freeform"
 
 
