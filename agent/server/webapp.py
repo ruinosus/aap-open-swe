@@ -14,7 +14,7 @@ from langchain_core.messages.content import create_text_block
 from langgraph_sdk import get_client
 from langgraph_sdk.client import LangGraphClient
 
-from .aap_config import (
+from ..aap_config import (
     get_allowed_github_orgs,
     get_default_repo_name,
     get_default_repo_owner,
@@ -24,14 +24,14 @@ from .aap_config import (
     get_slack_repo_name,
     get_slack_repo_owner,
 )
-from .utils.auth import (
+from ..utils.auth import (
     is_bot_token_only_mode,
     persist_encrypted_github_token,
     resolve_github_token_from_email,
 )
-from .utils.comments import get_recent_comments
-from .utils.github_app import get_github_app_installation_token
-from .utils.github_comments import (
+from ..utils.comments import get_recent_comments
+from ..utils.github_app import get_github_app_installation_token
+from ..utils.github_comments import (
     OPEN_SWE_TAGS,
     build_pr_prompt,
     extract_pr_context,
@@ -43,13 +43,13 @@ from .utils.github_comments import (
     sanitize_github_comment_body,
     verify_github_signature,
 )
-from .utils.github_token import get_github_token_from_thread
-from .utils.github_user_email_map import GITHUB_USER_EMAIL_MAP
-from .utils.linear import post_linear_trace_comment
-from .utils.linear_team_repo_map import LINEAR_TEAM_TO_REPO
-from .utils.multimodal import dedupe_urls, extract_image_urls, fetch_image_block
-from .utils.repo import extract_repo_from_text
-from .utils.slack import (
+from ..utils.github_token import get_github_token_from_thread
+from ..utils.github_user_email_map import GITHUB_USER_EMAIL_MAP
+from ..utils.linear import post_linear_trace_comment
+from ..utils.linear_team_repo_map import LINEAR_TEAM_TO_REPO
+from ..utils.multimodal import dedupe_urls, extract_image_urls, fetch_image_block
+from ..utils.repo import extract_repo_from_text
+from ..utils.slack import (
     add_slack_reaction,
     fetch_slack_thread_messages,
     format_slack_messages_for_prompt,

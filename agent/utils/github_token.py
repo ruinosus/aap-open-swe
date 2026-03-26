@@ -9,7 +9,7 @@ from langgraph.config import get_config
 from langgraph_sdk import get_client
 from langgraph_sdk.errors import NotFoundError
 
-from ..encryption import decrypt_token
+from ..server.encryption import decrypt_token
 
 logger = logging.getLogger(__name__)
 
