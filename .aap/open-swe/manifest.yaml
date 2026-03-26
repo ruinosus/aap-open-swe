@@ -55,6 +55,9 @@ spec:
       name: Code Review
       description: Reviews PR diffs for bugs, logic errors, code smells, and standards adherence
       instruction: skills/code-review.md
+      category: review
+      outputFormat: structured
+      branchPattern: ""
       trigger: pull_request
       auto_invoke:
         triggers: ["review", "code review", "PR review", "review this"]
@@ -63,6 +66,9 @@ spec:
       name: Security Scan
       description: Scans PR diffs for OWASP Top 10, hardcoded secrets, CVEs, and injection patterns
       instruction: skills/security-scan.md
+      category: review
+      outputFormat: structured
+      branchPattern: ""
       trigger: pull_request
       auto_invoke:
         triggers: ["security", "vulnerability", "CVE", "secrets", "security scan"]
@@ -71,6 +77,9 @@ spec:
       name: Doc Generator
       description: Generates and updates code documentation (docstrings, inline docs)
       instruction: skills/doc-generator.md
+      category: pr
+      outputFormat: freeform
+      branchPattern: ""
       trigger: push_main
       auto_invoke:
         triggers: ["docstrings", "code docs", "generate docstrings"]
@@ -79,6 +88,9 @@ spec:
       name: Project Docs
       description: Updates project markdown files (README, ARCHITECTURE, etc.) to match current codebase
       instruction: skills/project-docs.md
+      category: pr
+      outputFormat: freeform
+      branchPattern: ""
       trigger: push_main
       auto_invoke:
         triggers: ["docs", "documentation", "update docs", "readme", "architecture", "project docs"]
@@ -87,6 +99,9 @@ spec:
       name: Test Generator
       description: Generates unit tests for code with low or no test coverage
       instruction: skills/test-generator.md
+      category: pr
+      outputFormat: freeform
+      branchPattern: ""
       trigger: label_needs_tests
       auto_invoke:
         triggers: ["tests", "test coverage", "generate tests", "needs-tests", "add tests"]
@@ -95,6 +110,9 @@ spec:
       name: AAP SDK Sizing
       description: Analyzes a repository and generates an AAP SDK migration report with findings organized in 5 layers
       instruction: skills/aap-sizing.md
+      category: analysis
+      outputFormat: freeform
+      branchPattern: "aap-migration/sizing"
       trigger: on_demand
       auto_invoke:
         triggers: ["sizing", "migration report", "analyze repo", "migration analysis", "aap sizing"]
@@ -103,9 +121,60 @@ spec:
       name: AAP SDK Migration
       description: Migrates a repository to AAP SDK manifest-driven architecture in incremental layers
       instruction: skills/migrate-to-aap.md
+      category: migration
+      outputFormat: freeform
+      branchPattern: "aap-migration/full"
       trigger: on_demand
       auto_invoke:
         triggers: ["migrate", "migration", "migrate to aap", "aap migration", "migrate layer"]
+
+    - id: respond-review
+      name: Respond to Review
+      description: Auto-replies to PR review comments based on git diff
+      instruction: ""
+      category: utility
+      outputFormat: none
+      branchPattern: ""
+      trigger: on_demand
+      auto_invoke:
+        triggers: ["respond-review", "respond review"]
+
+  # ─── Git Identity ─────────────────────────────────────────
+  git:
+    authorName: "aap-open-swe[bot]"
+    authorEmail: "aap-open-swe@users.noreply.github.com"
+    defaultBranchPattern: "aap-open-swe/issue-{issue_number}"
+    protectedBranches:
+      - main
+      - master
+
+  # ─── Formatting Constants ────────────────────────────────
+  formatting:
+    statusIcons:
+      success: "\u2705"
+      failure: "\u274c"
+      running: "\u23f3"
+      pending: "\u2b1c"
+    severityIcons:
+      critical: "\U0001f534"
+      high: "\U0001f534"
+      medium: "\U0001f7e1"
+      low: "\U0001f7e2"
+    layerIcons:
+      1: "\U0001f9f1"
+      2: "\U0001f527"
+      3: "\U0001f3a8"
+      4: "\U0001f6e1\ufe0f"
+      5: "\u2728"
+      6: "\U0001f4bb"
+
+  # ─── Report Templates ───────────────────────────────────
+  templates:
+    executionReport: templates/execution-report.hbs
+    sizingReport: templates/sizing-report.hbs
+    reviewSummary: templates/review-summary.hbs
+    progressComment: templates/progress-comment.hbs
+    prDescription: templates/pr-description.hbs
 
   # ─── Artifacts (Configuration) ─────────────────────────────
   artifacts:

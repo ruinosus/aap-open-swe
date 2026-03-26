@@ -21,7 +21,7 @@ def test_get_skills_loads_7_skills():
 
     _reset()
     skills = get_skills()
-    assert len(skills) == 7
+    assert len(skills) == 8
     ids = [s.id for s in skills]
     assert "code-review" in ids
     assert "security-scan" in ids
