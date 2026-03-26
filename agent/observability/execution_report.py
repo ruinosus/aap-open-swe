@@ -4,7 +4,12 @@ import json
 import re
 import time
 
-from agent.config import get_formatting, get_skill
+from agent.config import (
+    get_default_agent_id,
+    get_formatting,
+    get_output_truncation_limit,
+    get_skill,
+)
 from agent.config.templates import render_template
 
 
@@ -59,10 +64,10 @@ def build_execution_report(
 
     if success:
         status = "Success" if has_changes else "Success (no changes)"
-        status_icon = status_icons.get("success", "\u2705")
+        status_icon = status_icons.get("success", "")
     else:
         status = "Failed"
-        status_icon = status_icons.get("failure", "\u274c")
+        status_icon = status_icons.get("failure", "")
 
     # Objective from manifest skill description
     objective = _extract_objective(task, skill_id, repo_owner, repo_name)
@@ -87,7 +92,7 @@ def build_execution_report(
         "cost": cost_str,
         "objective": objective,
         "summary": summary,
-        "skill_id": skill_id or "swe-coder",
+        "skill_id": skill_id or get_default_agent_id(),
         "model_id": model_id,
         "llm_calls": llm_calls,
         "input_tokens": f"{input_tokens:,}" if input_tokens else "",
@@ -95,7 +100,9 @@ def build_execution_report(
         "total_tokens": f"{total_tokens:,}" if total_tokens else "",
         "tool_calls": tool_calls,
         "estimated_cost": cost_str if estimated_cost is not None else "",
-        "raw_output": _redact_secrets(agent_response[:5000]) if agent_response else "",
+        "raw_output": _redact_secrets(agent_response[: get_output_truncation_limit()])
+        if agent_response
+        else "",
         "guardrail_suggestions": guardrail_suggestions,
         "guardrail_count": len(guardrail_suggestions),
     }
