@@ -265,6 +265,14 @@ spec:
       category: skills
       defaultValue: ''
 
+    # Agent prompt templates (inline content, read via artifact_value)
+    - key: open-swe.prompts.fallback
+      category: prompts
+      defaultValue: "You are a coding assistant. Your working directory is {working_dir}. Use the execute tool to run commands. Be concise and focused."
+    - key: open-swe.prompts.runner_context
+      category: prompts
+      defaultValue: "\n\n---\n\n### GitHub Actions Context\n\nYou are running inside a GitHub Actions workflow on repository {repo_owner}/{repo_name}.\nIssue/PR number: #{issue_number}\n\nWhen you are done with your changes:\n1. Run linters/formatters if available\n2. Stage and commit your changes with a descriptive message\n3. Push to a new branch named `{branch_pattern}`\n4. The workflow will handle creating the PR and commenting on the issue.\n\nDo NOT call commit_and_open_pr or github_comment tools — they are not available here.\nUse the execute tool for all git operations."
+
     # Agent defaults
     - key: open-swe.config.default_agent_id
       category: configuration

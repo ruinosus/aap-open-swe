@@ -26,6 +26,7 @@ from .manifest import (  # noqa: F401
     get_output_truncation_limit,
     get_pagination_limit,
     get_pricing_api_url,
+    get_prompt_template,
     get_recursion_limit,
     get_rules,
     get_sandbox_type,

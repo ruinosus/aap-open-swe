@@ -33,6 +33,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         get_model_max_tokens,
         get_model_temperature,
         get_output_truncation_limit,
+        get_prompt_template,
         get_skill_branch,
         get_skill_category,
         get_skill_instruction,
@@ -150,31 +151,20 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
                     agents_md_section="",
                 )
             else:
-                system_prompt = (
-                    f"You are a coding assistant. Your working directory is {repo_dir}. "
-                    "Use the execute tool to run commands. Be concise and focused."
-                )  # fallback: manifest agent instruction not found
+                # Fallback prompt from manifest artifact
+                fallback = get_prompt_template("fallback")
+                system_prompt = fallback.replace("{working_dir}", repo_dir) if fallback else ""
 
-        # Add GitHub Actions context to the prompt
+        # Append runner context from manifest artifact
         _branch_pattern = get_default_branch_pattern().format(issue_number=issue_number)
-        system_prompt += f"""
-
----
-
-### GitHub Actions Context
-
-You are running inside a GitHub Actions workflow on repository {repo_owner}/{repo_name}.
-Issue/PR number: #{issue_number}
-
-When you are done with your changes:
-1. Run linters/formatters if available
-2. Stage and commit your changes with a descriptive message
-3. Push to a new branch named `{_branch_pattern}`
-4. The workflow will handle creating the PR and commenting on the issue.
-
-Do NOT call commit_and_open_pr or github_comment tools — they are not available here.
-Use the execute tool for all git operations.
-"""
+        runner_context = get_prompt_template("runner_context")
+        if runner_context:
+            system_prompt += (
+                runner_context.replace("{repo_owner}", repo_owner)
+                .replace("{repo_name}", repo_name)
+                .replace("{issue_number}", str(issue_number))
+                .replace("{branch_pattern}", _branch_pattern)
+            )
         gh_notice(f"Skill: {skill_id or _default_agent_id}, prompt: {len(system_prompt)} chars")
 
     # Build response_format for review-type skills (structured output).

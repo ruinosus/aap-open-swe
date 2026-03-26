@@ -133,6 +133,16 @@ def get_message(key: str, default: str = "") -> str:
     return _artifact(f"open-swe.messages.{key}", default=default)
 
 
+# ── Prompt templates ──────────────────────────
+def get_prompt_template(key: str) -> str:
+    """Read a prompt template from manifest artifacts.
+
+    key: e.g., "fallback", "runner_context"
+    Returns the artifact value (inline content) or empty string.
+    """
+    return _artifact(f"open-swe.prompts.{key}", default="")
+
+
 # ── Module identity ──────────────────────────
 def get_module_name() -> str:
     m = _mi().manifest
