@@ -24,6 +24,7 @@ dependencies = [
     "langchain-modal>=0.0.2",
     "langchain-runloop>=0.0.3",
     "cockpit-aap-sdk>=0.6.0",
+    "chevron>=0.14.0",
 ]
 
 [project.optional-dependencies]
