@@ -2,14 +2,15 @@
 
 
 def test_get_skills_returns_list():
-    from agent.aap_config import get_skills
+    from agent.config import get_skills
 
     skills = get_skills()
     assert isinstance(skills, list)
 
 
 def test_get_skills_loads_4_skills():
-    from agent.aap_config import _load_manifest, get_skills
+    from agent.aap_config import _load_manifest
+    from agent.config import get_skills
 
     _load_manifest.cache_clear()
     skills = get_skills()
@@ -25,7 +26,8 @@ def test_get_skills_loads_4_skills():
 
 
 def test_get_skill_by_id():
-    from agent.aap_config import _load_manifest, get_skill
+    from agent.aap_config import _load_manifest
+    from agent.config import get_skill
 
     _load_manifest.cache_clear()
     skill = get_skill("code-review")
@@ -35,7 +37,7 @@ def test_get_skill_by_id():
 
 
 def test_get_skill_unknown_returns_none():
-    from agent.aap_config import get_skill
+    from agent.config import get_skill
 
     assert get_skill("nonexistent-skill") is None
 
@@ -71,7 +73,8 @@ def test_skill_adapter_detects_security_trigger():
 
 
 def test_get_skill_instruction_returns_content():
-    from agent.aap_config import _load_manifest, get_skill_instruction
+    from agent.aap_config import _load_manifest
+    from agent.config import get_skill_instruction
 
     _load_manifest.cache_clear()
     instruction = get_skill_instruction("code-review")

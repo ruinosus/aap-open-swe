@@ -129,13 +129,14 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     from deepagents import create_deep_agent
     from deepagents.backends import LocalShellBackend
 
-    from agent.aap_config import (
+    from agent.config import (
         get_agent_instruction,
         get_manifest,
         get_model_id,
         get_model_max_tokens,
         get_model_temperature,
         get_skill_instruction,
+        make_model,
     )
     from agent.observability import (
         ProgressReporter,
@@ -145,7 +146,6 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         write_step_summary,
     )
     from agent.observability.streaming_callback import create_callbacks
-    from agent.utils.model import make_model
 
     _start_time = time.time()
 
@@ -307,7 +307,7 @@ Use the execute tool for all git operations.
 
     # Repository protection — blocks pushes to repos outside ALLOWED_GITHUB_ORGS.
     # External repos MUST be forked first. This is a critical safety guardrail.
-    from agent.aap_config import get_allowed_github_orgs
+    from agent.config import get_allowed_github_orgs
     from agent.middleware.repo_protection import create_repo_protection_middleware
 
     repo_protection_mw = create_repo_protection_middleware(
@@ -357,7 +357,7 @@ Use the execute tool for all git operations.
 
     # Set recursion_limit high enough for multi-step tasks.
     # Original Open SWE uses 1000. A 5-layer migration may need 50+ turns.
-    from agent.aap_config import get_recursion_limit
+    from agent.config import get_recursion_limit
 
     invoke_config = {"recursion_limit": get_recursion_limit()}
     logger.info("Recursion limit: %d", invoke_config["recursion_limit"])
