@@ -3,7 +3,7 @@ from typing import Any
 
 from langgraph.config import get_config
 
-from ..utils.slack import post_slack_thread_reply
+from ..slack.client import post_slack_thread_reply
 
 
 def slack_thread_reply(message: str) -> dict[str, Any]:

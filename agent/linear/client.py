@@ -1,17 +1,47 @@
-"""Linear API utilities."""
+"""Linear API utilities and team-to-repo mapping."""
 
 from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 import httpx
 
-from agent.utils.langsmith import get_langsmith_trace_url
+from agent.server.langsmith import get_langsmith_trace_url
 
 logger = logging.getLogger(__name__)
 
 LINEAR_API_KEY = os.environ.get("LINEAR_API_KEY", "")
+
+LINEAR_TEAM_TO_REPO: dict[str, dict[str, Any] | dict[str, str]] = {
+    "Brace's test workspace": {"owner": "langchain-ai", "name": "open-swe"},
+    "Yogesh-dev": {
+        "projects": {
+            "open-swe-v3-test": {"owner": "aran-yogesh", "name": "nimedge"},
+            "open-swe-dev-test": {"owner": "aran-yogesh", "name": "TalkBack"},
+        },
+        "default": {
+            "owner": "aran-yogesh",
+            "name": "TalkBack",
+        },  # Fallback for issues without project
+    },
+    "LangChain OSS": {
+        "projects": {
+            "deepagents": {"owner": "langchain-ai", "name": "deepagents"},
+            "langchain": {"owner": "langchain-ai", "name": "langchain"},
+        }
+    },
+    "Applied AI": {
+        "projects": {
+            "GTM Engineering": {"owner": "langchain-ai", "name": "ai-sdr"},
+        },
+        "default": {"owner": "langchain-ai", "name": "ai-sdr"},
+    },
+    "Docs": {"default": {"owner": "langchain-ai", "name": "docs"}},
+    "Open SWE": {"default": {"owner": "langchain-ai", "name": "open-swe"}},
+    "LangSmith Deployment": {"default": {"owner": "langchain-ai", "name": "langgraph-api"}},
+}
 
 
 async def comment_on_linear_issue(

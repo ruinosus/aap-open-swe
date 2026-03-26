@@ -3,13 +3,13 @@ import asyncio
 import pytest
 
 from agent.server import webapp
-from agent.utils.slack import (
+from agent.server.webapp import generate_thread_id_from_slack_thread
+from agent.slack.client import (
     format_slack_messages_for_prompt,
     replace_bot_mention_with_username,
     select_slack_context_messages,
     strip_bot_mention,
 )
-from agent.server.webapp import generate_thread_id_from_slack_thread
 
 
 class _FakeNotFoundError(Exception):

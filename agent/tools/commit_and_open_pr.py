@@ -18,8 +18,7 @@ from ..github.api import (
     git_push,
 )
 from ..github.app import get_github_token
-from ..utils.sandbox_paths import resolve_repo_dir
-from ..utils.sandbox_state import get_sandbox_backend_sync
+from ..sandbox.state import get_sandbox_backend_sync, resolve_repo_dir
 
 logger = logging.getLogger(__name__)
 

@@ -30,8 +30,7 @@ from ..github.api import (
     git_push,
 )
 from ..github.app import get_github_token
-from ..utils.sandbox_paths import aresolve_repo_dir
-from ..utils.sandbox_state import get_sandbox_backend
+from ..sandbox.state import aresolve_repo_dir, get_sandbox_backend
 
 logger = logging.getLogger(__name__)
 

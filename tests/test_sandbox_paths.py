@@ -4,7 +4,7 @@ import shlex
 
 from deepagents.backends.protocol import ExecuteResponse
 
-from agent.utils.sandbox_paths import (
+from agent.sandbox.state import (
     aresolve_repo_dir,
     resolve_repo_dir,
     resolve_sandbox_work_dir,

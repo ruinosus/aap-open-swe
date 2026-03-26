@@ -7,8 +7,8 @@ import json
 
 from fastapi.testclient import TestClient
 
-from agent.server import webapp
 from agent.github import comments as github_comments
+from agent.server import webapp
 
 _TEST_WEBHOOK_SECRET = "test-secret-for-webhook"
 

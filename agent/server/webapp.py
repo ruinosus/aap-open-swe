@@ -43,12 +43,10 @@ from ..github.comments import (
     sanitize_github_comment_body,
     verify_github_signature,
 )
-from ..github.users import GITHUB_USER_EMAIL_MAP
-from ..utils.linear import post_linear_trace_comment
-from ..utils.linear_team_repo_map import LINEAR_TEAM_TO_REPO
-from ..utils.multimodal import dedupe_urls, extract_image_urls, fetch_image_block
 from ..github.repo import extract_repo_from_text
-from ..utils.slack import (
+from ..github.users import GITHUB_USER_EMAIL_MAP
+from ..linear.client import LINEAR_TEAM_TO_REPO, post_linear_trace_comment
+from ..slack.client import (
     add_slack_reaction,
     fetch_slack_thread_messages,
     format_slack_messages_for_prompt,
@@ -60,6 +58,7 @@ from ..utils.slack import (
     strip_bot_mention,
     verify_slack_signature,
 )
+from .multimodal import dedupe_urls, extract_image_urls, fetch_image_block
 
 logger = logging.getLogger(__name__)
 

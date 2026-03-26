@@ -13,9 +13,9 @@ from langgraph.config import get_config
 from langgraph.graph.state import RunnableConfig
 from langgraph_sdk import get_client
 
+from ..linear.client import comment_on_linear_issue
 from ..server.encryption import encrypt_token
-from ..utils.linear import comment_on_linear_issue
-from ..utils.slack import post_slack_ephemeral_message, post_slack_thread_reply
+from ..slack.client import post_slack_ephemeral_message, post_slack_thread_reply
 from .app import get_github_app_installation_token, get_github_token_from_thread
 from .users import GITHUB_USER_EMAIL_MAP
 

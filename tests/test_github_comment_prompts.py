@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from agent.github import comments as github_comments
 from agent.server import webapp
 from agent.server.prompt import construct_system_prompt
-from agent.github import comments as github_comments
 
 
 def test_build_pr_prompt_wraps_external_comments_without_trust_section() -> None:

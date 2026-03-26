@@ -33,12 +33,14 @@ from ..aap_config import (
     get_model_temperature,
     get_recursion_limit,
 )
+from ..github.auth import resolve_github_token
 from ..middleware import (
     ToolErrorMiddleware,
     check_message_queue_before_model,
     ensure_no_empty_msg,
     open_pr_if_needed,
 )
+from ..sandbox.state import create_sandbox
 from ..tools import (
     commit_and_open_pr,
     fetch_url,
@@ -47,9 +49,7 @@ from ..tools import (
     linear_comment,
     slack_thread_reply,
 )
-from ..github.auth import resolve_github_token
 from ..utils.model import make_model
-from ..utils.sandbox import create_sandbox
 from .prompt import construct_system_prompt
 
 client = get_client()
@@ -58,7 +58,6 @@ SANDBOX_CREATING = "__creating__"
 SANDBOX_CREATION_TIMEOUT = 180
 SANDBOX_POLL_INTERVAL = 1.0
 
-from ..utils.agents_md import read_agents_md_in_sandbox
 from ..github.api import (
     _CRED_FILE_PATH,
     cleanup_git_credentials,
@@ -67,8 +66,13 @@ from ..github.api import (
     remove_directory,
     setup_git_credentials,
 )
-from ..utils.sandbox_paths import aresolve_repo_dir, aresolve_sandbox_work_dir
-from ..utils.sandbox_state import SANDBOX_BACKENDS, get_sandbox_id_from_metadata
+from ..sandbox.state import (
+    SANDBOX_BACKENDS,
+    aresolve_repo_dir,
+    aresolve_sandbox_work_dir,
+    get_sandbox_id_from_metadata,
+)
+from .agents_md import read_agents_md_in_sandbox
 
 
 async def _clone_or_pull_repo_in_sandbox(  # noqa: PLR0915

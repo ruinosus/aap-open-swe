@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent.utils.multimodal import extract_image_urls
+from agent.server.multimodal import extract_image_urls
 
 
 def test_extract_image_urls_empty() -> None:
