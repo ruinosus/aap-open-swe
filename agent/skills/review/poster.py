@@ -92,7 +92,7 @@ def parse_review_output(agent_response: str) -> dict | None:
 
 def format_review_summary(review: dict, skill_id: str) -> str:
     """Format review data as a markdown summary comment."""
-    from agent.config import get_manifest, get_skill
+    from agent.config import get_manifest, get_module_display_name, get_skill
     from agent.config.templates import render_template
 
     skill_obj = get_skill(skill_id)
@@ -109,13 +109,8 @@ def format_review_summary(review: dict, skill_id: str) -> str:
 
     severity_line = " | ".join(f"**{k}**: {v}" for k, v in sorted(severities.items()))
 
-    manifest = get_manifest()
-    module_name = "AAP Open SWE"
-    if manifest and hasattr(manifest, "metadata"):
-        meta = manifest.metadata
-        module_name = (
-            getattr(meta, "displayName", None) or getattr(meta, "display_name", None) or module_name
-        )
+    get_manifest()  # ensure manifest is loaded
+    module_name = get_module_display_name()
 
     # Try template rendering first
     rendered = render_template(
@@ -145,6 +140,8 @@ def post_pr_review(
 
     Returns True if successful, False otherwise.
     """
+    from agent.config import get_http_timeout
+
     token = github_token or os.environ.get("GITHUB_TOKEN", "")
     if not token:
         logger.error("No GitHub token available for posting review")
@@ -177,7 +174,7 @@ def post_pr_review(
     }
 
     try:
-        resp = httpx.post(api_url, headers=headers, json=payload, timeout=30)
+        resp = httpx.post(api_url, headers=headers, json=payload, timeout=get_http_timeout() * 3)
         if resp.status_code in (200, 201):
             logger.info("Posted PR review with %d inline comments", len(review_comments))
             return True

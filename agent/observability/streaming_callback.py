@@ -14,17 +14,19 @@ from .gh_actions import _sanitize, gh_error
 logger = logging.getLogger("streaming_callback")
 
 # Live pricing from models.dev — fetched once, cached for the process lifetime
-_MODELS_DEV_URL = "https://models.dev/api.json"
 _pricing_cache: dict | None = None
 
 
 def _get_pricing_data() -> dict:
     """Fetch and cache pricing data from models.dev."""
+    from agent.config import get_pricing_api_url
+
     global _pricing_cache
     if _pricing_cache is not None:
         return _pricing_cache
+    url = get_pricing_api_url()
     try:
-        resp = _requests.get(_MODELS_DEV_URL, timeout=5)
+        resp = _requests.get(url, timeout=5)
         if resp.ok:
             _pricing_cache = resp.json()
             logger.info("Loaded pricing data from models.dev (%d providers)", len(_pricing_cache))
@@ -97,9 +99,12 @@ class AgentStreamingCallback(BaseCallbackHandler):
             self.progress_reporter.log_tool_call(tool_name, snippet)
 
     def on_tool_end(self, output: str, *, run_id: UUID, **kwargs: Any) -> None:
+        from agent.config import get_tool_output_truncation
+
         out_str = _sanitize(str(output))
-        if len(out_str) > 500:
-            print(out_str[:500], flush=True)
+        _truncation_limit = get_tool_output_truncation()
+        if len(out_str) > _truncation_limit:
+            print(out_str[:_truncation_limit], flush=True)
             print(f"... ({len(out_str)} chars total)", flush=True)
         print("::endgroup::", flush=True)
         self._active_groups.pop(run_id, None)

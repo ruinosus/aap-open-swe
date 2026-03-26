@@ -7,6 +7,8 @@ import subprocess
 
 import requests
 
+from agent.config import get_default_bot_login, get_http_timeout, get_message, get_pagination_limit
+
 logger = logging.getLogger("review_responder")
 
 
@@ -18,7 +20,10 @@ def get_review_comments(repo_owner: str, repo_name: str, pr_number: int, token: 
     page = 1
     while True:
         resp = requests.get(
-            url, headers=headers, params={"page": page, "per_page": 100}, timeout=15
+            url,
+            headers=headers,
+            params={"page": page, "per_page": get_pagination_limit()},
+            timeout=get_http_timeout(),
         )
         if not resp.ok:
             logger.warning("Failed to fetch PR comments: %s", resp.status_code)
@@ -60,7 +65,7 @@ def reply_to_comment(
         f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/comments/{comment_id}/replies"
     )
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
-    resp = requests.post(url, headers=headers, json={"body": body}, timeout=10)
+    resp = requests.post(url, headers=headers, json={"body": body}, timeout=get_http_timeout())
     if not resp.ok:
         logger.warning("Failed to reply to comment %s: %s", comment_id, resp.status_code)
     return resp.ok
@@ -72,7 +77,7 @@ def respond_to_review(
     pr_number: int,
     token: str,
     repo_dir: str = ".",
-    bot_login: str = "github-actions",
+    bot_login: str | None = None,
 ) -> dict:
     """Respond to all unaddressed review comments on a PR.
 
@@ -83,6 +88,7 @@ def respond_to_review(
 
     Returns summary dict with counts.
     """
+    resolved_bot_login = bot_login if bot_login is not None else get_default_bot_login()
     comments = get_review_comments(repo_owner, repo_name, pr_number, token)
     if not comments:
         return {"total": 0, "replied": 0, "skipped": 0}
@@ -91,7 +97,7 @@ def respond_to_review(
     top_level = [
         c
         for c in comments
-        if c.get("user", {}).get("login") == bot_login and not c.get("in_reply_to_id")
+        if c.get("user", {}).get("login") == resolved_bot_login and not c.get("in_reply_to_id")
     ]
     replies_by_parent = {}
     for c in comments:
@@ -132,13 +138,13 @@ def respond_to_review(
         )
 
         if path in changed_files:
-            reply = f"Addressed in {head_sha}."
+            reply = get_message("review_addressed", "Addressed in {sha}.").format(sha=head_sha)
             if reply_to_comment(repo_owner, repo_name, pr_number, comment_id, reply, token):
                 stats["replied"] += 1
             else:
                 stats["skipped"] += 1
-        elif "[LOW]" in body:
-            reply = "Acknowledged."
+        elif get_message("low_severity_marker", "[LOW]") in body:
+            reply = get_message("review_acknowledged", "Acknowledged.")
             if reply_to_comment(repo_owner, repo_name, pr_number, comment_id, reply, token):
                 stats["replied"] += 1
             else:
