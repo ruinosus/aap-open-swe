@@ -407,9 +407,37 @@ spec:
         status: completed
         priority: high
       - id: dynamic-skills
-        title: Dynamic skills — code-review, security-scan, doc-generator, test-generator
+        title: Dynamic skills — code-review, security-scan, doc-generator, test-generator, sizing, migration
         status: completed
         priority: high
+      - id: cross-repo-migration
+        title: Cross-repo AAP SDK migration (fork + 6-layer migrate with Layer 6 code integration)
+        status: completed
+        priority: high
+      - id: observability
+        title: Agent observability — log groups, live progress, streaming callbacks, token tracking, cost estimation
+        status: completed
+        priority: high
+      - id: execution-reports
+        title: Structured execution reports with objective, actions, metrics, and cost (models.dev live pricing)
+        status: completed
+        priority: high
+      - id: manifest-driven-runtime
+        title: Manifest as single source of truth — templates, skill routing, git identity, formatting from YAML
+        status: completed
+        priority: high
+      - id: codebase-reorganization
+        title: Layered feature-first codebase structure (runner, server, config, skills, adapters)
+        status: completed
+        priority: medium
+      - id: respond-review
+        title: Auto-respond to PR review comments based on git diff
+        status: completed
+        priority: medium
+      - id: guardrail-suggestions
+        title: Security scan suggests AAP guardrail manifests for findings
+        status: completed
+        priority: medium
       - id: multi-agent-orchestration
         title: Multi-agent task decomposition with specialized sub-agents
         status: planned
@@ -418,6 +446,14 @@ spec:
         title: CI/CD feedback loop — agent retries on CI failure
         status: planned
         priority: medium
+      - id: webapp-deployment
+        title: LangGraph webapp server deployment (Docker, Cloud Run)
+        status: planned
+        priority: medium
+      - id: conversation-persistence
+        title: Multi-turn conversation persistence via ConversationPort
+        status: planned
+        priority: low
       - id: custom-sandbox-templates
         title: Per-repo custom sandbox templates with pre-installed dependencies
         status: planned
@@ -436,6 +472,24 @@ spec:
         context: Deep Agents provides the core agent loop, sandbox, and tool infrastructure
         decision: AAP SDK wraps config only — no changes to Deep Agents internals
         decidedAt: '2026-03-22'
+      - id: manifest-templates
+        title: Use Mustache/Handlebars templates from manifest for all report formatting
+        status: accepted
+        context: 80+ hardcoded values across 22 files, adding a skill required editing 9 files
+        decision: All report formatting via .hbs templates in .aap/open-swe/templates/, chevron for Python rendering
+        decidedAt: '2026-03-26'
+      - id: live-pricing
+        title: Use models.dev API for real-time LLM pricing instead of hardcoded table
+        status: accepted
+        context: Hardcoded pricing becomes stale when models change
+        decision: Fetch https://models.dev/api.json once per process, cache in memory
+        decidedAt: '2026-03-25'
+      - id: gpt-5-4-mini
+        title: Switch default model from Claude Sonnet to GPT-5.4 mini
+        status: accepted
+        context: Anthropic credits depleted, GPT-5.4 mini is 4x cheaper for similar quality
+        decision: Set OPEN_SWE_MODEL=openai:gpt-5.4-mini as repo variable
+        decidedAt: '2026-03-25'
 
   # ─── Labels ────────────────────────────────────────────────
   labels:
