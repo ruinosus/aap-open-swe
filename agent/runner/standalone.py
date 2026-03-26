@@ -51,7 +51,7 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     skill_id = os.environ.get("SKILL_ID", "")
     pr_number = int(os.environ.get("PR_NUMBER", "0"))
     if skill_id == "respond-review" and pr_number:
-        from agent.review_responder import respond_to_review
+        from agent.skills.review.responder import respond_to_review
 
         logger.info("Responding to review comments on PR #%d", pr_number)
         stats = respond_to_review(repo_owner, repo_name, pr_number, github_token, repo_dir)
@@ -173,7 +173,7 @@ Use the execute tool for all git operations.
         try:
             from langchain.agents.structured_output import ProviderStrategy
 
-            from agent.schemas import SKILL_SCHEMAS
+            from agent.skills.schemas import SKILL_SCHEMAS
 
             schema = SKILL_SCHEMAS.get(skill_id)
             if schema:
@@ -301,7 +301,7 @@ Use the execute tool for all git operations.
 
     # Post review if skill is review-type
     if skill_id in ("code-review", "security-scan") and pr_number:
-        from agent.review_poster import parse_review_output, post_pr_review
+        from agent.skills.review.poster import parse_review_output, post_pr_review
 
         # Prefer structured_data if available, else parse from free-form text
         review = None

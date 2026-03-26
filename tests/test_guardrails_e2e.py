@@ -49,8 +49,8 @@ async def test_review_skill_with_sdk_guardrails():
 
     from agent.aap_config import get_manifest
     from agent.middleware.output_validator import create_output_validator
-    from agent.review_poster import parse_review_output
-    from agent.schemas import ReviewOutput
+    from agent.skills.review.poster import parse_review_output
+    from agent.skills.schemas import ReviewOutput
     from agent.utils.model import make_model
 
     model_id = _get_model_id()
