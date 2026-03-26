@@ -50,7 +50,9 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
     # Handle respond-review skill — no agent needed, just reply to PR comments
     skill_id = os.environ.get("SKILL_ID", "")
     pr_number = int(os.environ.get("PR_NUMBER", "0"))
-    if skill_id == "respond-review" and pr_number:
+    from agent.config import get_skill_category as _get_skill_category
+
+    if _get_skill_category(skill_id) == "utility" and pr_number:
         from agent.skills.review.responder import respond_to_review
 
         logger.info("Responding to review comments on PR #%d", pr_number)
@@ -93,8 +95,11 @@ async def run_agent(task: str, repo_dir: str, repo_owner: str, repo_name: str, i
         sandbox = LocalShellBackend(root_dir=repo_dir, inherit_env=True, virtual_mode=True)
 
         # Configure git identity
-        sandbox.execute("git config user.name 'aap-open-swe[bot]'")
-        sandbox.execute("git config user.email 'aap-open-swe@users.noreply.github.com'")
+        from agent.config import get_git_identity
+
+        git_name, git_email = get_git_identity()
+        sandbox.execute(f"git config user.name '{git_name}'")
+        sandbox.execute(f"git config user.email '{git_email}'")
 
     with gh_group("Model loading"):
         # Load model from manifest
@@ -167,9 +172,11 @@ Use the execute tool for all git operations.
     # PR-type skills (doc-generator, test-generator, project-docs) need tool
     # calling to execute git commands, so they must NOT use response_format
     # which forces immediate JSON return without tool use.
+    from agent.config import get_skill_category, is_structured_output_skill, uses_default_tools
+
     response_format = None
-    review_skills = ("code-review", "security-scan")
-    if skill_id in review_skills:
+    use_structured = is_structured_output_skill(skill_id)
+    if use_structured:
         try:
             from langchain.agents.structured_output import ProviderStrategy
 
@@ -224,11 +231,9 @@ Use the execute tool for all git operations.
     # Add ensure_no_empty_msg middleware for skills that use tools.
     # This is the key insight from the original Open SWE: it forces the agent
     # to ALWAYS call a tool on every turn, preventing early JSON-only returns.
-    pr_skills = ("doc-generator", "test-generator", "project-docs", "migrate-to-aap")
-    analysis_skills = ("aap-sizing",)
-    use_default_tools = skill_id in pr_skills or skill_id in analysis_skills
+    _use_default_tools = uses_default_tools(skill_id)
 
-    if use_default_tools:
+    if _use_default_tools:
         from agent.middleware.ensure_no_empty_msg import ensure_no_empty_msg
 
         middleware.append(ensure_no_empty_msg)
@@ -240,7 +245,7 @@ Use the execute tool for all git operations.
         agent = create_deep_agent(
             model=model,
             system_prompt=system_prompt,
-            **({} if use_default_tools else {"tools": []}),
+            **({} if _use_default_tools else {"tools": []}),
             backend=sandbox,
             response_format=response_format,
             middleware=middleware if middleware else None,
@@ -300,7 +305,7 @@ Use the execute tool for all git operations.
     logger.info("Agent finished with %d messages", len(messages))
 
     # Post review if skill is review-type
-    if skill_id in ("code-review", "security-scan") and pr_number:
+    if get_skill_category(skill_id) == "review" and pr_number:
         from agent.skills.review.poster import parse_review_output, post_pr_review
 
         # Prefer structured_data if available, else parse from free-form text
@@ -337,12 +342,13 @@ Use the execute tool for all git operations.
     has_changes = has_uncommitted or has_unpushed
 
     # Use skill-specific branch names
-    skill_branch_names = {
-        "aap-sizing": "aap-migration/sizing",
-        "migrate-to-aap": "aap-migration/full",
-    }
-    branch_name = skill_branch_names.get(
-        skill_id, current_branch_name or f"aap-open-swe/issue-{issue_number}"
+    from agent.config import get_default_branch_pattern, get_skill_branch
+
+    skill_branch = get_skill_branch(skill_id)
+    branch_name = (
+        skill_branch
+        or current_branch_name
+        or get_default_branch_pattern().format(issue_number=issue_number)
     )
 
     if has_changes:
@@ -364,9 +370,9 @@ Use the execute tool for all git operations.
                 sandbox.execute("git add -A")
                 sandbox.execute(f'git commit -m "fix: address issue #{issue_number}"')
 
-            if branch_name == "main" or branch_name == "master":
+            if branch_name in ("main", "master"):
                 # Don't push to main — create a feature branch
-                branch_name = f"aap-open-swe/issue-{issue_number}"
+                branch_name = get_default_branch_pattern().format(issue_number=issue_number)
                 sandbox.execute(f"git checkout -b {branch_name}")
 
             push_result = sandbox.execute(
@@ -380,7 +386,7 @@ Use the execute tool for all git operations.
         progress.complete_phase("Push & PR")
 
     # Format sizing reports as rich markdown before output
-    if skill_id == "aap-sizing":
+    if get_skill_category(skill_id) == "analysis":
         agent_response = format_sizing_markdown(agent_response)
 
     # Build execution report first, then finalize progress with it

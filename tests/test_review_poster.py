@@ -99,6 +99,8 @@ def test_format_review_summary():
         ],
     }
     md = format_review_summary(review, "code-review")
-    assert "### AAP Open SWE — Code Review" in md
+    # Header uses manifest displayName (or fallback) followed by skill name
+    assert "### " in md
+    assert "Code Review" in md
     assert "7/10" in md
     assert "high" in md.lower()

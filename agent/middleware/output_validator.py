@@ -71,10 +71,15 @@ def create_output_validator(skill_id: str):
 
     Returns None if no validation is needed for the skill.
     """
-    review_skills = ("code-review", "security-scan")
+    from agent.config import is_structured_output_skill
+
+    # Fallback hardcoded tuples for environments where manifest is unavailable
+    _review_skills_fallback = ("code-review", "security-scan")
     pr_skills = ("doc-generator", "test-generator", "project-docs")
 
-    if skill_id not in review_skills and skill_id not in pr_skills:
+    is_review = is_structured_output_skill(skill_id) or skill_id in _review_skills_fallback
+
+    if not is_review and skill_id not in pr_skills:
         return None
 
     @after_agent
@@ -102,7 +107,7 @@ def create_output_validator(skill_id: str):
 
         output_type = data.get("skill_output_type", "")
 
-        if skill_id in review_skills:
+        if is_review:
             errors = validate_review_output(data)
         elif skill_id in pr_skills:
             errors = validate_pr_output(data)
